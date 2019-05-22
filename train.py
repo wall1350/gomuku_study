@@ -10,7 +10,9 @@ from tf_policy_value_net import PolicyValueNet
 from mcts_pure import MCTSPlayer as MCTS_Pure
 from mcts_alphaZero import MCTSPlayer
 
-#import os
+import os
+import tensorflow as tf
+import multiprocessing as mp
 #os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
@@ -173,6 +175,8 @@ class TrainPipeline():
             print('\n\rquit')
     
 if __name__ == '__main__':
-    
+    core_num = mp.cpu_count()
+    config = tf.ConfigProto(inter_op_parallelism_threads=core_num,intra_op_parallelism_threads=core_num)
     training_pipeline = TrainPipeline()
     training_pipeline.run()    
+    
