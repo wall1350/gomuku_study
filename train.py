@@ -127,7 +127,7 @@ class TrainPipeline():
                             explained_var_new))        
 
         
-    def policy_evaluate(self, n_games=14):
+    def policy_evaluate(self, n_games=10):
         """
         Evaluate the trained policy by playing games against the pure MCTS player
         Note: this is only for monitoring the progress of training
