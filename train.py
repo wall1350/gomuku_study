@@ -38,7 +38,7 @@ class TrainPipeline():
         self.game_batch_num = 5000
         self.best_win_ratio = 0.0
         # num of simulations used for the pure mcts, which is used as the opponent to evaluate the trained policy
-        self.pure_mcts_playout_num = 3000
+        self.pure_mcts_playout_num = 300
         
         # start training from a new policy-value net
         self.policy_value_net = PolicyValueNet(self.board_width, self.board_height, self.n_in_row) 
@@ -127,7 +127,7 @@ class TrainPipeline():
                             explained_var_new))        
 
         
-    def policy_evaluate(self, n_games=14):
+    def policy_evaluate(self, n_games=10):
         """
         Evaluate the trained policy by playing games against the pure MCTS player
         Note: this is only for monitoring the progress of training
