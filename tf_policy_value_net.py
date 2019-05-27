@@ -9,8 +9,8 @@ import random
 from collections import defaultdict
 from collections import deque
 import os
-import plaidml.keras
-plaidml.keras.install_backend()
+# import plaidml.keras
+# plaidml.keras.install_backend()
 import tensorflow as tf
 import keras
 
