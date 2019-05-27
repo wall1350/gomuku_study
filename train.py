@@ -16,6 +16,7 @@ import keras
 from keras import backend as K
 import numpy as np
 import multiprocessing as mp
+#os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -25,13 +26,13 @@ os.environ["KERAS_BACKEND"] = "plaidml.keras.backend"
 
 class TrainPipeline():
     def __init__(self):
-        
+
         config = tf.ConfigProto()
         config.gpu_options.per_process_gpu_memory_fraction = 0.8
         core_num = mp.cpu_count()
         # create session
         config = tf.ConfigProto(log_device_placement=True,inter_op_parallelism_threads=0,intra_op_parallelism_threads=core_num,allow_soft_placement=True)
-        
+
         config.gpu_options.allow_growth = True
         self.sess = tf.Session(config=config)
         print("self.sess",self.sess)
@@ -146,6 +147,27 @@ class TrainPipeline():
                             explained_var_old,
                             explained_var_new))
 
+        if verbose:
+            explained_var_old = (1 -
+                                 np.var(np.array(winner_batch) - old_v.flatten()) /
+                                 np.var(np.array(winner_batch)))
+            explained_var_new = (1 -
+                                 np.var(np.array(winner_batch) - new_v.flatten()) /
+                                 np.var(np.array(winner_batch)))
+
+            print(("kl: {:.3f}, "
+                   "lr_multiplier: {:.3f}\n"
+                   "loss: {:.3f}, "
+                   "entropy: {:.3f}\n"
+                   "explained old: {:.3f}, "
+                   "explained new: {:.3f}\n"
+                   ).format(kl,
+                            self.lr_multiplier,
+                            np.mean(loss_list),
+                            np.mean(entropy_list),
+                            explained_var_old,
+                            explained_var_new))
+
 
     def policy_evaluate(self, n_games=10):
         """
@@ -193,6 +215,6 @@ class TrainPipeline():
             print('\n\rquit')
 
 if __name__ == '__main__':
-    
+
     training_pipeline = TrainPipeline()
     training_pipeline.run()
