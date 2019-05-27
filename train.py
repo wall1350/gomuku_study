@@ -8,8 +8,8 @@ from tf_policy_value_net import PolicyValueNet
 from mcts_pure import MCTSPlayer as MCTS_Pure
 from mcts_alphaZero import MCTSPlayer
 import os
-import plaidml.keras
-plaidml.keras.install_backend()
+# import plaidml.keras
+# plaidml.keras.install_backend()
 import tensorflow as tf
 import keras
 # import other stuff
