@@ -16,47 +16,47 @@ class PolicyValueNet():
         self.board_height = 15
         #self.model_file = './model/tf_policy_{}_{}_{}_model'.format(board_width, board_height, n_in_row)
         self.model_file = './model/{}/tf_policy_15_15_5_model'.format(date)
-        self.sess = tf.compat.v1.Session()
+        self.sess = tf.Session()
         self.l2_const = 1e-4  #  coef of l2 penalty 
         self._create_policy_value_net() 
         self._loss_train_op()
-        self.saver = tf.compat.v1.train.Saver()
+        self.saver = tf.train.Saver()
         self.restore_model()
             
     def _create_policy_value_net(self):
         """create the policy value network """    
-        with tf.compat.v1.name_scope("inputs"):
-            self.state_input = tf.compat.v1.placeholder(tf.float32, shape=[None, 4, self.board_width, self.board_height], name="state")
+        with tf.name_scope("inputs"):
+            self.state_input = tf.placeholder(tf.float32, shape=[None, 4, self.board_width, self.board_height], name="state")
 #            self.state = tf.transpose(self.state_input, [0, 2, 3, 1])
             
-            self.winner = tf.compat.v1.placeholder(tf.float32, shape=[None], name="winner") 
+            self.winner = tf.placeholder(tf.float32, shape=[None], name="winner") 
             self.winner_reshape = tf.reshape(self.winner, [-1,1])
-            self.mcts_probs = tf.compat.v1.placeholder(tf.float32, shape=[None, self.board_width*self.board_height], name="mcts_probs")
+            self.mcts_probs = tf.placeholder(tf.float32, shape=[None, self.board_width*self.board_height], name="mcts_probs")
         
         # conv layers
-        conv1 = tf.compat.v1.layers.conv2d(self.state_input, filters=32, kernel_size=3,
+        conv1 = tf.layers.conv2d(self.state_input, filters=32, kernel_size=3,
                          strides=1, padding="SAME", data_format='channels_first',
                          activation=tf.nn.relu, name="conv1")
-        conv2 = tf.compat.v1.layers.conv2d(conv1, filters=64, kernel_size=3,
+        conv2 = tf.layers.conv2d(conv1, filters=64, kernel_size=3,
                          strides=1, padding="SAME", data_format='channels_first',
                          activation=tf.nn.relu, name="conv2")               
-        conv3 = tf.compat.v1.layers.conv2d(conv2, filters=128, kernel_size=3,
+        conv3 = tf.layers.conv2d(conv2, filters=128, kernel_size=3,
                          strides=1, padding="SAME", data_format='channels_first',
                          activation=tf.nn.relu, name="conv3")
         
         # action policy layers
-        policy_net = tf.compat.v1.layers.conv2d(conv3, filters=4, kernel_size=1,
+        policy_net = tf.layers.conv2d(conv3, filters=4, kernel_size=1,
                          strides=1, padding="SAME", data_format='channels_first',
                          activation=tf.nn.relu, name="policy_net")
         policy_net_flat = tf.reshape(policy_net, shape=[-1, 4*self.board_width*self.board_height])
-        self.policy_net_out = tf.compat.v1.layers.dense(policy_net_flat, self.board_width*self.board_height, name="output")
+        self.policy_net_out = tf.layers.dense(policy_net_flat, self.board_width*self.board_height, name="output")
         self.action_probs = tf.nn.softmax(self.policy_net_out, name="policy_net_proba")
 
         # state value layers
-        value_net = tf.compat.v1.layers.conv2d(conv3, filters=2, kernel_size=1, data_format='channels_first',
+        value_net = tf.layers.conv2d(conv3, filters=2, kernel_size=1, data_format='channels_first',
                                      name='value_conv', activation=tf.nn.relu)
-        value_net = tf.compat.v1.layers.dense(tf.contrib.layers.flatten(value_net), 64, activation=tf.nn.relu)
-        self.value = tf.compat.v1.layers.dense(value_net, units=1, activation=tf.nn.tanh)
+        value_net = tf.layers.dense(tf.contrib.layers.flatten(value_net), 64, activation=tf.nn.relu)
+        self.value = tf.layers.dense(value_net, units=1, activation=tf.nn.tanh)
     
     def _loss_train_op(self):
         """
@@ -64,18 +64,18 @@ class PolicyValueNet():
         loss = (z - v)^2 + pi^T * log(p) + c||theta||^2
         """
         l2_penalty = 0
-        for v in tf.compat.v1.trainable_variables():
+        for v in tf.trainable_variables():
             if not 'bias' in v.name.lower():
                 l2_penalty += tf.nn.l2_loss(v)
-        value_loss = tf.reduce_mean(input_tensor=tf.square(self.winner_reshape - self.value))
-        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=self.policy_net_out, labels=tf.stop_gradient(self.mcts_probs))
-        policy_loss = tf.reduce_mean(input_tensor=cross_entropy)
+        value_loss = tf.reduce_mean(tf.square(self.winner_reshape - self.value))
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=self.policy_net_out, labels=self.mcts_probs)
+        policy_loss = tf.reduce_mean(cross_entropy)
         self.loss =  value_loss + policy_loss + self.l2_const*l2_penalty
         # policy entropy，for monitoring only
         self.entropy = policy_loss
         # get the train op   
-        self.learning_rate = tf.compat.v1.placeholder(tf.float32)
-        optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=self.learning_rate)
+        self.learning_rate = tf.placeholder(tf.float32)
+        optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
         self.training_op = optimizer.minimize(self.loss)
         
     def get_policy_value(self, state_batch):
@@ -112,4 +112,4 @@ class PolicyValueNet():
             self.saver.restore(self.sess, self.model_file)
         else:
             print("\n\nThe model is not exist!")
-            self.sess.run(tf.compat.v1.global_variables_initializer())
+            self.sess.run(tf.global_variables_initializer())
