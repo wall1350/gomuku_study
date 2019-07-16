@@ -1,4 +1,4 @@
-# AlphaZero_Gomoku-tensorflow （gomuku_study）
+# AlphaZero_Gomoku-tensorflow （gomoku_study）
 
 Forked from [zouyih/AlphaZero_Gomoku-tensorflow](https://github.com/zouyih/AlphaZero_Gomoku-tensorflow) with some changes:  
 
