@@ -19,5 +19,3 @@ To train the model:
 ### Example of Game
 
 ![Example](https://i.imgur.com/fTZAAoB.png)  
-
-there's another interesting implementation of reinforcement learning [DQN-tensorflow-gluttonous_snake](https://github.com/zouyih/DQN-tensorflow-gluttonous_snake)
