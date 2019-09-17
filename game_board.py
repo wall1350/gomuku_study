@@ -8,6 +8,8 @@ Created on Fri Dec  7 15:14:24 2018
 import numpy as np
 from collections import deque
 from GUI_v1_4 import GUI
+import pygame
+from pygame.locals import *
 
 class Board(object):
     '''
@@ -160,34 +162,50 @@ class Board(object):
         n = self.n_in_row
 
         moved = list(set(range(width * height)) - set(self.availables))
-        # moves have been played
-        if len(moved) < self.n_in_row + 2:
-            # too few moves to get 5-in-a-row
+        if len(moved) < self.n_in_row *2-1:
             return False, -1
 
-        for m in moved:
-            h = m // width
-            w = m % width
-            player = states[m]
+        h = self.last_move // width
+        w = self.last_move % width
+        player = states[self.last_move]
 
-            if (w in range(width - n + 1) and
-                    len(set(states.get(i, -1) for i in range(m, m + n))) == 1):
-                # for each move in moved moves,judge if there's a 5-in-a-row in a line
+        judge = 0
+        for i in range(w - n + 1, w + n): #上至下
+            if i < 0 or i >= width:
+                continue
+            judge = judge + 1 if(states.get(i + h * width, -1) == player) else 0
+            if judge == 5:
+                return True, player
+        judge = 0
+        for i in range(h - n + 1, h + n): #左至右
+            if i < 0 or i >= height:
+                continue
+            judge = judge + 1 if(states.get(i * width + w, -1) == player) else 0
+            if judge == 5:
                 return True, player
 
-            if (h in range(height - n + 1) and
-                    len(set(states.get(i, -1) for i in range(m, m + n * width, width))) == 1):
-                # for each move in moved moves,judge if there's a 5-in-a-row in a column
+        judge = 0
+        i = h - n
+        j = w + n
+        for count in range(9): #左下到右上
+            i += 1
+            j -= 1
+            if i < 0 or i >= height or j < 0 or j >= width:
+                continue
+            judge = judge + 1 if(states.get(i * width + j, -1) == player) else 0
+            if judge == 5:
                 return True, player
 
-            if (w in range(width - n + 1) and h in range(height - n + 1) and
-                    len(set(states.get(i, -1) for i in range(m, m + n * (width + 1), width + 1))) == 1):
-                # for each move in moved moves,judge if there's a 5-in-a-row in a top right diagonal
-                return True, player
-
-            if (w in range(n - 1, width) and h in range(height - n + 1) and
-                    len(set(states.get(i, -1) for i in range(m, m + n * (width - 1), width - 1))) == 1):
-                # for each move in moved moves,judge if there's a 5-in-a-row in a top left diagonal
+        judge = 0
+        i = h - n
+        j = w - n
+        for count in range(9): #左上到右下
+            i += 1
+            j += 1
+            if i < 0 or i >= height or j < 0 or j >= width:
+                continue
+            judge = judge + 1 if(states.get(i * width + j, -1) == player) else 0
+            if judge == 5:
                 return True, player
 
         return False, -1
@@ -221,6 +239,92 @@ class Game(object):
         '''
         self.board = board
 
+    def forbidden(self, h, w, player=1):
+        height = self.board.height
+        width = self.board.width
+        states = self.board.states
+        n = self.board.n_in_row
+        restricted = [0,0] # 33, 44
+        buffer = ["33333333333" for j in range(4)] # 3: 棋盤外
+
+        for i in range(w - n, w + n + 1): #下至上
+            if i < 0 or i >= width:
+                continue
+            buffer[0] = buffer[0][:i-w+5] + str(states.get(i + h * width, 0)) + buffer[0][i-w+6:]
+            buffer[0] = buffer[0][:5] + str(player) + buffer[0][6:]
+
+        for i in range(h - n, h + n + 1): #左至右
+            if i < 0 or i >= height:
+                continue
+            buffer[1] = buffer[1][:i-h+5] + str(states.get(i * width + w, 0)) + buffer[1][i-h+6:]
+            buffer[1] = buffer[1][:5] + str(player) + buffer[1][6:]
+
+        i = h - n - 1
+        j = w + n + 1
+        for count in range(11): #左上至右下
+            i += 1
+            j -= 1
+            if i < 0 or i >= height or j < 0 or j >= width:
+                continue
+            buffer[2] = buffer[2][:count] + str(states.get(i * width + j, 0)) + buffer[2][count+1:]
+            buffer[2] = buffer[2][:5] + str(player) + buffer[2][6:]
+
+        i = h - n - 1
+        j = w - n - 1
+        for count in range(11): #左下至右上
+            i += 1
+            j += 1
+            if i < 0 or i >= height or j < 0 or j >= width:
+                continue
+            buffer[3] = buffer[3][:count] + str(states.get(i * width + j, 0)) + buffer[3][count+1:]
+            buffer[3] = buffer[3][:5] + str(player) + buffer[3][6:]
+
+        #print()
+        #print(buffer[0])
+        #print(buffer[1])
+        #print(buffer[2])
+        #print(buffer[3])
+        #print()
+
+        for i in range(4):
+            judge = 0
+            for j in range(11):
+                judge = judge+1 if(buffer[i][j]==str(player)) else 0
+                if judge == 5:
+                    return 1 if (j<10 and buffer[i][j+1]==str(player)) else 2 # 1長連禁手  2 win
+
+        for i in range(4):
+            restricted[1] = restricted[1]+1 if(buffer[i].find("011110")!=-1 or buffer[i].find("011112")!=-1 or buffer[i].find("211110")!=-1 or buffer[i].find("011113")!=-1 or buffer[i].find("311110")!=-1) else restricted[1]
+            if buffer[i].find("10111") != -1:
+                restricted[1] = restricted[1] if(buffer[i].find("1101110")!=-1 or buffer[i].find("0101111")!=-1 or buffer[i].find("1101111")!=-1) else restricted[1]+1
+            if buffer[i].find("11011") != -1:
+                if(not (buffer[i].find("1110110")!=-1 or buffer[i].find("0110111")!=-1 or buffer[i].find("1110111")!=-1)):
+                    restricted[1] = restricted[1]+1
+                    #print(i, buffer[i].find("11011"))
+                    if(not (buffer[i].find("1110110", buffer[i].find("11011")+1)!=-1 or buffer[i].find("0110111", buffer[i].find("11011")+1)!=-1 or buffer[i].find("1110111", buffer[i].find("11011")+1)!=-1)):
+                        if buffer[i].find("11011", buffer[i].find("11011")+1) != -1:
+                            restricted[1] = restricted[1]+1
+                            #print(i, buffer[i].find("11011", buffer[i].find("11011")+1))
+            if buffer[i].find("11101") != -1:
+                restricted[1] = restricted[1] if(buffer[i].find("1111010")!=-1 or buffer[i].find("0111011")!=-1 or buffer[i].find("1111011")!=-1) else restricted[1]+1
+
+        #print("四:{}".format(restricted[1]))
+        if(restricted[1] > 1):
+            return 3
+
+        for i in range(4):
+            if buffer[i].find("01110") != -1:
+                restricted[0] = restricted[0] if(buffer[i].find("100111001")!=-1 or buffer[i].find("11101")!=-1 or buffer[i].find("10111")!=-1 or buffer[i].find("10011102")!=-1 or buffer[i].find("20111001")!=-1 or buffer[i].find("2011102")!=-1 or buffer[i].find("2011103")!=-1 or buffer[i].find("3011102")!=-1 or buffer[i].find("10011103")!=-1 or buffer[i].find("30111001")!=-1) else restricted[0]+1
+            if buffer[i].find("010110") != -1:
+                restricted[0] = restricted[0] if(buffer[i].find("00101101")!=-1 or buffer[i].find("10101100")!=-1 or buffer[i].find("10101101")!=-1 or buffer[i].find("10101102")!=-1 or buffer[i].find("20101101")!=-1 or buffer[i].find("10101103")!=-1 or buffer[i].find("30101101")!=-1) else restricted[0]+1
+            if buffer[i].find("011010") != -1:
+                restricted[0] = restricted[0] if(buffer[i].find("00110101")!=-1 or buffer[i].find("10110100")!=-1 or buffer[i].find("10110101")!=-1 or buffer[i].find("10110102")!=-1 or buffer[i].find("20110101")!=-1 or buffer[i].find("10110103")!=-1 or buffer[i].find("30110101")!=-1) else restricted[0]+1
+
+        #print("三:{}".format(restricted[0]))
+        #print()
+        if(restricted[0] > 1):
+            return 4
+
     def graphic(self, board, player1, player2):
         '''
         Draw the board and show game info
@@ -253,7 +357,7 @@ class Game(object):
             # print('\r\n') # new line
             print('\r')
 
-    def start_play(self, player1, player2, start_player=0, is_shown=1,print_prob =True):
+    def start_play(self, player1, player2, start_player=0, is_shown=1,print_prob=True):
         '''
         start a game between two players
         '''
@@ -274,6 +378,18 @@ class Game(object):
             current_player = self.board.get_current_player()
             player_in_turn = players[current_player]
             move,move_probs = player_in_turn.get_action(self.board,is_selfplay=False,print_probs_value=print_prob)
+
+            if current_player==start_player+1:
+                availables = [i for i in self.board.availables]
+                i, j = self.board.move_to_location(move)
+                ban = self.forbidden(i, j)
+                while ban == 1 or ban == 3 or ban == 4:
+                    print("禁手!!", i, j)
+                    self.board.availables.remove(move)
+                    move, move_probs = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
+                    i, j = self.board.move_to_location(move)
+                    ban = self.forbidden(i, j)
+                self.board.availables = [i for i in availables]
 
             self.board.do_move(move)
 
@@ -296,26 +412,57 @@ class Game(object):
         '''
         AI.reset_player()
         self.board.init_board()
-        current_player = SP = start_player
+        current_player = SP = start_player+1
         UI = GUI(self.board.width)
+        UI.SP = SP
         end = False
         while True:
+
+            if SP == 0:
+                UI._draw_text("Human(black)", (765, 150), text_height=UI.TestSize)
+                UI._draw_text("AlphaZero(white)", (925, 150), text_height=UI.TestSize)
+            else:
+                UI._draw_text("AlphaZero(black)", (775, 150), text_height=UI.TestSize)
+                UI._draw_text("Human(white)", (925, 150), text_height=UI.TestSize)
+
             print('current_player', current_player)
+            if current_player == 1:
+                UI.show_messages('Your turn')
+            else:
 
-            #if current_player == 0:
-                #UI.show_messages('Your turn')
-            #else:
-                #UI.show_messages('AI\'s turn')
+                UI.show_messages('AI\'s turn')
 
-            if current_player == 1 and not end:
+            for move_availables in self.board.availables:
+                i, j = self.board.move_to_location(move_availables)
+                ban = self.forbidden(i, j)
+
+                if ban == 1 or ban == 3 or ban == 4:
+                    print("ban at ",move_availables)
+                    UI._draw_ban((i, j))
+
+            if current_player == 2 and not end:
                 move, move_probs = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
+                if current_player == SP:
+                    availables = [i for i in self.board.availables]
+
+
+                    i, j = self.board.move_to_location(move)
+                    ban = self.forbidden(i, j)
+                    while ban == 1 or ban == 3 or ban == 4:
+                        print("禁手!!", i, j)
+                        self.board.availables.remove(move)
+                        move, move_probs = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
+                        i, j = self.board.move_to_location(move)
+                        ban = self.forbidden(i, j)
+                    self.board.availables = [i for i in availables]
             else:
                 inp = UI.get_input()
                 if inp[0] == 'move' and not end:
-                    if type(inp[1]) != int:
-                        move = UI.loc_2_move(inp[1])
-                    else:
-                        move = inp[1]
+                    move = inp[1]
+                    if current_player == SP:
+                        ban = self.forbidden(inp[2],inp[3])
+                        if ban == 1 or ban == 3 or ban == 4:
+                            continue
                 elif inp[0] == 'RestartGame':
                     end = False
                     current_player = SP
@@ -335,8 +482,10 @@ class Game(object):
                     UI.restart_game(False)
                     UI.reset_score()
                     AI.reset_player()
-                    SP = (SP+1) % 2
+                    SP = self.board.players[0] if SP == self.board.players[1] else self.board.players[1]
                     current_player = SP
+                    UI.SP=SP
+
                     continue
                 else:
                     # print('ignored inp:', inp)
@@ -346,19 +495,28 @@ class Game(object):
                 # print(move, type(move), current_player)
                 UI.render_step(move, self.board.current_player)
                 self.board.do_move(move)
+                UI.show_messages('AI\'s turn')
                 # print('move', move)
                 # print(2, self.board.get_current_player())
-                current_player = (current_player + 1) % 2
+                current_player = self.board.players[0] if current_player == self.board.players[1] else self.board.players[1]
                 # UI.render_step(move, current_player)
                 end, winner = self.board.game_end()
                 if end:
                     if winner != -1:
                         print("Game end. Winner is player", winner)
                         UI.add_score(winner)
+
+                        if winner == 1:
+                            #UI.show_messages("Game end. Winner is 1 ")
+                            UI._draw_text("Game end. Winner is  player 1 ", (500, 690), text_height=UI.TestSize)
+                        elif winner == 2:
+                            #UI.show_messages("Game end. Winner is 2 ")
+                            UI._draw_text("Game end. Winner is player 2 ", (500, 690), text_height=UI.TestSize)
                     else:
                         print("Game end. Tie")
-                    print(UI.score)
-                    print()
+                        UI._draw_text("Game end. Tie ", (775, 750), text_height=UI.TestSize)
+                    #print(UI.score)
+                    #print()
 
     def start_self_play(self, player, is_shown=0):
         '''
@@ -372,6 +530,20 @@ class Game(object):
             move, move_probs = player.get_action(self.board,
                                                  is_selfplay=True,
                                                  print_probs_value=False)
+
+            if current_player == 1:
+                availables = [i for i in self.board.availables]
+                i, j = self.board.move_to_location(move)
+                ban = self.forbidden(i, j)
+                while ban == 1 or ban == 3 or ban == 4:
+                    self.board.availables.remove(move)
+                    move, move_probs = player.get_action(self.board,
+                                                         is_selfplay=True,
+                                                         print_probs_value=False)
+                    i, j = self.board.move_to_location(move)
+                    ban = self.forbidden(i, j)
+                self.board.availables = [i for i in availables]
+
             # store the data
             states.append(self.board.current_state())
             mcts_probs.append(move_probs)
@@ -395,5 +567,3 @@ class Game(object):
                     else:
                         print("Game end. Tie")
                 return winner, zip(states, mcts_probs, winners_z)
-
-

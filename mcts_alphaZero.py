@@ -295,14 +295,14 @@ class MCTSPlayer(object):
 
             if print_probs_value and move_probs is not None:
                 act_probs, value = self.policy_value_function(board,self.action_fc,self.evaluation_fc)
-                print('-' * 10)
-                print('value',value)
+                """print('-' * 10)
+                print('value',value)"""
                 # print the probability of each move
                 probs = np.array(move_probs).reshape((board.width, board.height)).round(3)[::-1, :]
-                for p in probs:
+                """for p in probs:
                     for x in p:
                         print("{0:6}".format(x), end='')
-                    print('\r')
+                    print('\r')"""
 
             return move,move_probs
 

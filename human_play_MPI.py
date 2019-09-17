@@ -115,14 +115,110 @@ alpha_zero_player = MCTSPlayer(policy_value_function=best_policy.policy_value_fn
                          action_fc=best_policy.action_fc_test,
                          evaluation_fc=best_policy.evaluation_fc2_test,
                          c_puct=5,
-                         n_playout=40,
+                         n_playout=1,
                          is_selfplay=False)
 
 player1 = Human()
 player2 = alpha_zero_player
 # player2 = MCTS_Pure(5,200)
 
+def start_play(start_player=0, is_shown=1):
+    # run a gomoku game with AI in terminal
+    bcast_move = -1
 
+    # init game and player
+    board.init_board()
+    player2.reset_player()
+
+    end = False
+    if rank == 0 and is_shown:
+        # draw board in terminal
+        graphic(board=board)
+
+    if start_player == 0:
+        # human first to play
+        if rank == 0:
+            bcast_move,move_probs = player1.get_action(board=board,is_selfplay=False,print_probs_value=False)
+        # bcast the move to other ranks
+        bcast_move = comm.bcast(bcast_move, root=0)
+        # print('!'*10,rank,bcast_move)
+
+        # human do move
+        board.do_move(bcast_move)
+
+        if rank == 0:
+            # print move index
+            print(board.move_to_location(bcast_move))
+            if is_shown:
+                graphic(board=board)
+
+    while True:
+
+        # reset the search tree
+        player2.reset_player()
+        # AI's turn
+        if rank == 0:
+            # print prior probabilities
+            gather_move, move_probs = player2.get_action(board=board,is_selfplay=False,print_probs_value=True)
+        else:
+            gather_move, move_probs = player2.get_action(board=board, is_selfplay=False, print_probs_value=False)
+
+        gather_move_list = comm.gather(gather_move, root=0)
+
+        if rank == 0:
+            # gather ecah rank's move and get the most selected one
+            print('list is', gather_move_list)
+            bcast_move = Counter(gather_move_list).most_common()[0][0]
+
+        # bcast the move to other ranks
+        bcast_move = comm.bcast(bcast_move, root=0)
+        # print('!' * 10, rank, bcast_move)
+
+        # AI do move
+        board.do_move(bcast_move)
+        # print('rank:', rank, board.availables)
+
+        if rank == 0:
+            print(board.move_to_location(bcast_move))
+            if is_shown:
+                graphic(board=board)
+        end, winner = board.game_end()
+
+        # check if game end
+        if end:
+            if rank == 0:
+                if winner != -1:
+                    print("Game end. Winner is ", winner)
+                else:
+                    print("Game end. Tie")
+            break
+
+        # human's turn
+        if rank == 0:
+            bcast_move, move_probs = player1.get_action(board=board)
+
+        # bcast the move to other ranks
+        bcast_move = comm.bcast(bcast_move, root=0)
+        # print('!'*10,rank,bcast_move)
+
+        # human do move
+        board.do_move(bcast_move)
+        # print('rank:', rank, board.availables)
+
+        if rank == 0:
+            print(board.move_to_location(bcast_move))
+            if is_shown:
+                graphic(board=board)
+        end, winner = board.game_end()
+
+        # check if game end
+        if end:
+            if rank == 0:
+                if winner != -1:
+                    print("Game end. Winner is ", winner)
+                else:
+                    print("Game end. Tie")
+            break
 
 def start_play_with_UI(start_player=0):
     # run a gomoku game with AI in GUI
@@ -138,23 +234,20 @@ def start_play_with_UI(start_player=0):
     if rank == 0:
         SP = start_player
         UI = GUI(board.width)
-        #UI.show_messages('Your turn')
 
     while True:
 
-        # if rank == 0 and not end:
-            # if current_player_num == 0:
-                # UI.show_messages('Your turn')
-           #  else:
-               #  UI.show_messages('AI\'s turn')
+        if rank == 0:
+            if current_player_num == 0:
+                UI.show_messages('Your turn')
+            else:
+                UI.show_messages('AI\'s turn')
 
         # AI's turn
         if current_player_num == 1 and not end:
-
             # reset the search tree
             player2.reset_player()
             if rank == 0:
-
                 # print prior probabilities
                 gather_move, move_probs = player2.get_action(board=board, is_selfplay=False, print_probs_value=True)
             else:
@@ -167,13 +260,11 @@ def start_play_with_UI(start_player=0):
                 # gather ecah rank's move and get the most selected one
                 print('list is', gather_move_list)
                 bcast_move = Counter(gather_move_list).most_common()[0][0]
-
                 # print(board.move_to_location(bcast_move))
 
         # human's turn
         else:
             if rank == 0:
-                UI.show_messages('Your turn')
                 inp = UI.get_input()
                 if inp[0] == 'move' and not end:
                     if type(inp[1]) != int:
@@ -193,17 +284,10 @@ def start_play_with_UI(start_player=0):
                     restart = 'exit'
 
                 elif inp[0] == 'SwitchPlayer':
-
                     SP = (SP + 1) % 2
                     UI.restart_game(False)
                     UI.reset_score()
                     restart = SP+1
-                    if SP == 0:
-                        UI._draw_text("Human(black)", (765, 150), text_height=UI.TestSize)
-                        UI._draw_text("AlphaZero(white)", (925, 150), text_height=UI.TestSize)
-                    else:
-                        UI._draw_text("AlphaZero(black)", (775, 150), text_height=UI.TestSize)
-                        UI._draw_text("Human(white)", (925, 150), text_height=UI.TestSize)
 
                 else:
                     # print('ignored inp:', inp)
@@ -216,37 +300,24 @@ def start_play_with_UI(start_player=0):
             bcast_move = comm.bcast(bcast_move, root=0)
             # print('!'*10,rank,bcast_move)
             if rank == 0:
-                #print(board.move_to_location(bcast_move))
-                UI.show_messages('AI\'s turn')
+                print(board.move_to_location(bcast_move))
                 UI.render_step(bcast_move, board.current_player)
-
 
             # human do move
             board.do_move(bcast_move)
             # print('rank:', rank, board.availables)
 
             current_player_num = (current_player_num + 1) % 2
-
             end, winner = board.game_end()
 
             # check if game end
             if end:
                 if rank == 0:
                     if winner != -1:
-                        
                         print("Game end. Winner is ", winner)
                         UI.add_score(winner)
-                        if winner == 1:
-                            #UI.show_messages("Game end. Winner is 1 ")
-                            UI._draw_text("Game end. Winner is  player 1 ", (500, 690), text_height=UI.TestSize)
-                        elif winner == 2:
-                            #UI.show_messages("Game end. Winner is 2 ")
-                            UI._draw_text("Game end. Winner is player 2 ", (500, 690), text_height=UI.TestSize)
-                        
                     else:
                         print("Game end. Tie")
-                        #UI.show_messages("Game end. Tie")
-                        UI._draw_text("Game end. Tie ", (775, 750), text_height=UI.TestSize)
         else:
             if restart:
                 if restart == 'exit':
