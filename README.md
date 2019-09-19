@@ -1,4 +1,5 @@
-# AlphaZero-Gomoku-forbidden-step （gomoku_study using tensorflow）
+# AlphaZero-Gomoku-forbidden-step 
+（gomoku_study using tensorflow）
 
 Forked from [zouyih/AlphaZero_Gomoku-tensorflow](https://github.com/zouyih/AlphaZero_Gomoku-tensorflow) with some changes:  
 
