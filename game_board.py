@@ -304,7 +304,7 @@ class Game(object):
             #    restricted[1] = restricted[1] if(buffer[i].find("1111010")!=-1 or buffer[i].find("0111011")!=-1 or buffer[i].find("1111011")!=-1) else restricted[1]+1
             restricted[1] = restricted[1]+1 if(buffer[i].find("11101") != -1) else restricted[1]
             if restricted[1] - before > 1:
-                restricted[1] = restricted[1] if (buffer[i].find("111010111")!=-1 or buffer[i].find("11011011")!=-1 or buffer[i].find("1011101")!=-1) else restricted[1]-1
+                restricted[1] = restricted[1] if (buffer[i].find("111010111")!=-1 or buffer[i].find("11011011")!=-1 or buffer[i].find("1011101")!=-1) else 1
                 if restricted[1] > 1:
                     return 3
         #print("四:{}".format(restricted[1]))
