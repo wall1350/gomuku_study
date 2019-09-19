@@ -1,4 +1,4 @@
-# AlphaZero_Gomoku-tensorflow （gomoku_study）
+# AlphaZero_Gomoku-tensorflow-forbidden step （gomoku_study）
 
 Forked from [zouyih/AlphaZero_Gomoku-tensorflow](https://github.com/zouyih/AlphaZero_Gomoku-tensorflow) with some changes:  
 
@@ -24,4 +24,3 @@ python train.py
 
 ### Example of Game
 
-![Example](https://i.imgur.com/fTZAAoB.png)  
