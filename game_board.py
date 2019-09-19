@@ -16,8 +16,8 @@ class Board(object):
     board for the game
     '''
     def __init__(self, **kwargs):
-        self.width = int(kwargs.get('width', 11))
-        self.height = int(kwargs.get('height', 11))
+        self.width = int(kwargs.get('width', 15))
+        self.height = int(kwargs.get('height', 15))
         self.states = {}
         # board states stored as a dict,
         # key: move as location on the board,
@@ -246,16 +246,19 @@ class Game(object):
         n = self.board.n_in_row
         restricted = [0,0] # 33, 44
         buffer = ["33333333333" for j in range(4)] # 3: 棋盤外
+
         for i in range(w - n, w + n + 1): #下至上
             if i < 0 or i >= width:
                 continue
             buffer[0] = buffer[0][:i-w+5] + str(states.get(i + h * width, 0)) + buffer[0][i-w+6:]
             buffer[0] = buffer[0][:5] + str(player) + buffer[0][6:]
+
         for i in range(h - n, h + n + 1): #左至右
             if i < 0 or i >= height:
                 continue
             buffer[1] = buffer[1][:i-h+5] + str(states.get(i * width + w, 0)) + buffer[1][i-h+6:]
             buffer[1] = buffer[1][:5] + str(player) + buffer[1][6:]
+
         i = h - n - 1
         j = w + n + 1
         for count in range(11): #左上至右下
@@ -265,6 +268,7 @@ class Game(object):
                 continue
             buffer[2] = buffer[2][:count] + str(states.get(i * width + j, 0)) + buffer[2][count+1:]
             buffer[2] = buffer[2][:5] + str(player) + buffer[2][6:]
+
         i = h - n - 1
         j = w - n - 1
         for count in range(11): #左下至右上
@@ -274,18 +278,21 @@ class Game(object):
                 continue
             buffer[3] = buffer[3][:count] + str(states.get(i * width + j, 0)) + buffer[3][count+1:]
             buffer[3] = buffer[3][:5] + str(player) + buffer[3][6:]
+
         """print()
         print(buffer[0])
         print(buffer[1])
         print(buffer[2])
         print(buffer[3])
         print()"""
+
         for i in range(4):
             judge = 0
             for j in range(11):
                 judge = judge+1 if(buffer[i][j]==str(player)) else 0
                 if judge == 5:
                     return 1 if (j<10 and buffer[i][j+1]==str(player)) else 2 # 1長連禁手  2 win
+
         for i in range(4):
             before = restricted[1]
             restricted[1] = restricted[1]+1 if(buffer[i].find("011110")!=-1 or buffer[i].find("011112")!=-1 or buffer[i].find("211110")!=-1 or buffer[i].find("011113")!=-1 or buffer[i].find("311110")!=-1) else restricted[1]
@@ -303,13 +310,17 @@ class Game(object):
             #if buffer[i].find("11101") != -1:
             #    restricted[1] = restricted[1] if(buffer[i].find("1111010")!=-1 or buffer[i].find("0111011")!=-1 or buffer[i].find("1111011")!=-1) else restricted[1]+1
             restricted[1] = restricted[1]+1 if(buffer[i].find("11101") != -1) else restricted[1]
+            """print('before: ', restricted[1])"""
             if restricted[1] - before > 1:
                 restricted[1] = restricted[1] if (buffer[i].find("111010111")!=-1 or buffer[i].find("11011011")!=-1 or buffer[i].find("1011101")!=-1) else 1
                 if restricted[1] > 1:
                     return 3
+            """print('after: ', restricted[1])"""
+
         #print("四:{}".format(restricted[1]))
         if restricted[1] > 1:
             return 3
+
         for i in range(4):
             if buffer[i].find("01110") != -1:
                 restricted[0] = restricted[0] if(buffer[i].find("100111001")!=-1 or buffer[i].find("11101")!=-1 or buffer[i].find("10111")!=-1 or buffer[i].find("10011102")!=-1 or buffer[i].find("20111001")!=-1 or buffer[i].find("2011102")!=-1 or buffer[i].find("2011103")!=-1 or buffer[i].find("3011102")!=-1 or buffer[i].find("10011103")!=-1 or buffer[i].find("30111001")!=-1) else restricted[0]+1
@@ -317,6 +328,7 @@ class Game(object):
                 restricted[0] = restricted[0] if(buffer[i].find("00101101")!=-1 or buffer[i].find("10101100")!=-1 or buffer[i].find("10101101")!=-1 or buffer[i].find("10101102")!=-1 or buffer[i].find("20101101")!=-1 or buffer[i].find("10101103")!=-1 or buffer[i].find("30101101")!=-1) else restricted[0]+1
             if buffer[i].find("011010") != -1:
                 restricted[0] = restricted[0] if(buffer[i].find("00110101")!=-1 or buffer[i].find("10110100")!=-1 or buffer[i].find("10110101")!=-1 or buffer[i].find("10110102")!=-1 or buffer[i].find("20110101")!=-1 or buffer[i].find("10110103")!=-1 or buffer[i].find("30110101")!=-1) else restricted[0]+1
+
         #print("三:{}".format(restricted[0]))
         #print()
         if(restricted[0] > 1):
@@ -411,32 +423,25 @@ class Game(object):
         self.board.init_board()
         current_player = SP = start_player+1
         UI = GUI(self.board.width)
-        UI.SP = SP
         end = False
         while True:
-
-            if SP == 0:
-                UI._draw_text("Human(black)", (765, 150), text_height=UI.TestSize)
-                UI._draw_text("AlphaZero(white)", (925, 150), text_height=UI.TestSize)
-            else:
-                UI._draw_text("AlphaZero(black)", (775, 150), text_height=UI.TestSize)
-                UI._draw_text("Human(white)", (925, 150), text_height=UI.TestSize)
-
             print('current_player', current_player)
+
+
+
             if current_player == 1:
                 UI.show_messages('Your turn')
             else:
 
                 UI.show_messages('AI\'s turn')
 
-            if SP == 1:
-                for move_availables in self.board.availables:
-                    i, j = self.board.move_to_location(move_availables)
-                    ban = self.forbidden(i, j)
+            for move_availables in self.board.availables:
+                i, j = self.board.move_to_location(move_availables)
+                ban = self.forbidden(i, j)
 
-                    if ban == 1 or ban == 3 or ban == 4:
-                        print("ban at ",move_availables)
-                        UI._draw_ban((i, j))
+                if ban == 1 or ban == 3 or ban == 4:
+                    print("ban at ",move_availables)
+                    UI._draw_ban((i, j))
 
             if current_player == 2 and not end:
                 move, move_probs = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
@@ -482,8 +487,6 @@ class Game(object):
                     AI.reset_player()
                     SP = self.board.players[0] if SP == self.board.players[1] else self.board.players[1]
                     current_player = SP
-                    UI.SP=SP
-
                     continue
                 else:
                     # print('ignored inp:', inp)
@@ -500,23 +503,17 @@ class Game(object):
                 # UI.render_step(move, current_player)
                 end, winner = self.board.game_end()
                 if end:
-                    #UI.show_dialog() 預備給對話視窗用
                     if winner != -1:
                         print("Game end. Winner is player", winner)
                         UI.add_score(winner)
-                        UI._clean_ban()
+                        
 
-                        if winner == 1:
-                            #UI.show_messages("Game end. Winner is 1 ")
-                            UI._draw_text("Game end. Winner is  player 1 ", (500, 690), text_height=UI.TestSize)
-                        elif winner == 2:
-                            #UI.show_messages("Game end. Winner is 2 ")
-                            UI._draw_text("Game end. Winner is player 2 ", (500, 690), text_height=UI.TestSize)
+
+                        
                     else:
                         print("Game end. Tie")
-                        UI._draw_text("Game end. Tie ", (775, 750), text_height=UI.TestSize)
-                    #print(UI.score)
-                    #print()
+                    print(UI.score)
+                    print()
 
     def start_self_play(self, player, is_shown=0):
         '''
