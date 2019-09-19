@@ -528,7 +528,7 @@ class Game(object):
                                                  is_selfplay=True,
                                                  print_probs_value=False)
 
-            if current_player == 1:
+            if self.board.current_player == 1:
                 availables = [i for i in self.board.availables]
                 i, j = self.board.move_to_location(move)
                 ban = self.forbidden(i, j)
