@@ -395,7 +395,7 @@ class Game(object):
                 while ban == 1 or ban == 3 or ban == 4:
                     print("禁手!!", i, j)
                     self.board.availables.remove(move)
-                    move, move_probs = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
+                    move, move_probs = player_in_turn.get_action(self.board, is_selfplay=False, print_probs_value=1)
                     i, j = self.board.move_to_location(move)
                     ban = self.forbidden(i, j)
                 self.board.availables = [i for i in availables]
