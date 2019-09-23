@@ -423,12 +423,20 @@ class Game(object):
         self.board.init_board()
         current_player = SP = start_player+1
         UI = GUI(self.board.width)
+        UI.SP = SP
         end = False
         while True:
+            
+
+            
+            if SP == 1:
+                UI._draw_text("Human(black)", (765, 150), text_height=UI.TestSize)
+                UI._draw_text("AlphaZero(white)", (925, 150), text_height=UI.TestSize)
+            else:
+                UI._draw_text("AlphaZero(black)", (775, 150), text_height=UI.TestSize)
+                UI._draw_text("Human(white)", (925, 150), text_height=UI.TestSize)
+
             print('current_player', current_player)
-
-
-
             if current_player == 1:
                 UI.show_messages('Your turn')
             else:
@@ -439,7 +447,7 @@ class Game(object):
                 i, j = self.board.move_to_location(move_availables)
                 ban = self.forbidden(i, j)
 
-                if ban == 1 or ban == 3 or ban == 4:
+                if (ban == 1 or ban == 3 or ban == 4) and not end:
                     print("ban at ",move_availables)
                     UI._draw_ban((i, j))
 
@@ -487,6 +495,7 @@ class Game(object):
                     AI.reset_player()
                     SP = self.board.players[0] if SP == self.board.players[1] else self.board.players[1]
                     current_player = SP
+                    UI.SP=SP
                     continue
                 else:
                     # print('ignored inp:', inp)
@@ -507,11 +516,17 @@ class Game(object):
                         print("Game end. Winner is player", winner)
                         UI.add_score(winner)
                         
-
+                        if winner == 1:
+                            #UI.show_messages("Game end. Winner is 1 ")
+                            UI._draw_text("Game end. Winner is  player 1 ", (500, 690), text_height=UI.TestSize)
+                        elif winner == 2:
+                            #UI.show_messages("Game end. Winner is 2 ")
+                            UI._draw_text("Game end. Winner is player 2 ", (500, 690), text_height=UI.TestSize)
 
                         
                     else:
                         print("Game end. Tie")
+                        UI._draw_text("Game end. Tie ", (775, 750), text_height=UI.TestSize)
                     print(UI.score)
                     print()
 
