@@ -33,7 +33,7 @@ class GUI:
         self.score = [0, 0]
         self.BoardSize = board_size
         self.UnitSize = 40      # the basic size of all elements, try a different value!
-        self.TestSize = int(self.UnitSize * 0.5)
+        self.TestSize = int(self.UnitSize * 0.65)
         self.state = {}         # a dictionary for pieces on board. filled with move-player pairs, such as 34:1
         self.areas = {}         # a dictionary for button areas. filled with name-Rect pairs
         self.ScreenSize = None  # save the screen size for some calculation
@@ -44,7 +44,6 @@ class GUI:
         """self._background_color = (197, 227, 205)"""
         self._background_color = (247, 226, 193)
         self._board_color = (254, 185, 120)
-        self._button_color = (245, 154 , 35)
 
         self.reset(board_size)
 
@@ -286,7 +285,7 @@ class GUI:
             pygame.draw.line(self.screen, c, start_p2, end_p2)
 
     def _clean_ban(self):
-        print("_clean_ban")
+        #print("_clean_ban")
         self._draw_static()
         for chess in self.all_chess_list.sprites():
             if chess.player == 1:
@@ -299,24 +298,16 @@ class GUI:
 
 
     def _draw_ban(self,loc):
-        print("_draw_ban")
-
+        #print("_draw_ban")
         ban_image = pygame.image.load("ban.png")
         ban_image = pygame.transform.scale(ban_image, (50, 50))
         ban_image.convert()
         x, y = loc
         pos = int(self.UnitSize * 0.9 + x * self.UnitSize), int(self.UnitSize * 0.9 + (self.BoardSize - y - 1) * self.UnitSize)
-        #if player == 1:
-        #ban = Ban("ban.png", pos)
-        #self.all_ban_list.add(ban)
-        #print("all_ban_list ",self.all_ban_list)
-        #for ban in self.all_ban_list:
         self.screen.blit(ban_image,pos)
         pygame.display.update()
 
     def _draw_static(self):
-
-
         """
         Draw static elements that will not change in a round.
         """
@@ -381,16 +372,16 @@ class GUI:
     def _draw_button(self, name, high_light=0, update=False):
         rec = self.areas[name]
         if not high_light:
-            color = self._button_color
+            color = (240, 150 , 30)
         elif high_light == 1:
-            color = self._button_color
+            color = (255, 164 , 45)
         elif high_light == 2:
-            color = self._button_color
+            color = (255, 164 , 45)
         else:
             raise ValueError('high_light value error')
         pygame.draw.rect(self.screen, color, rec)
         pygame.draw.rect(self.screen, (0, 0, 0), rec, 1)
-        self._draw_text(name, rec.center, text_height=self.TestSize)
+        self._draw_text(name, rec.center, text_height=self.TestSize*0.7)
         if update:
             pygame.display.update()
 
@@ -411,10 +402,6 @@ if __name__ == '__main__':
     player = 1
     i = 1
     while True:
-        """if i == 1:
-            UI.show_messages('first player\'s turn')
-        else:
-            UI.show_messages('second player\'s turn')"""
         inp = UI.get_input()
         print(inp)
         UI.deal_with_input(inp, i)
