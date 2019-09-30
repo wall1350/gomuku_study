@@ -1,7 +1,7 @@
 # AlphaZero-Gomoku-forbidden-step 
 （gomoku_study using tensorflow）
 
-Forked from [zouyih/AlphaZero_Gomoku-tensorflow](https://github.com/zouyih/AlphaZero_Gomoku-tensorflow) with some changes:  
+Forked from [initial-h/AlphaZero_Gomoku_MPI](https://github.com/initial-h/AlphaZero_Gomoku_MPI) with some changes:  
 
 * rewrite the forbidden move detect (not yet)
 * added a GUI
