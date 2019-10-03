@@ -36,8 +36,7 @@ class TrainPipeline():
         self.batch_size = 512  # mini-batch size for training
         self.data_buffer = deque(maxlen=self.buffer_size)
         self.play_batch_size = 1 # play n games for each network training
-        """self.check_freq = 50"""
-        self.check_freq=1
+        self.check_freq = 50
         self.game_batch_num = 50000000 # total game to train
         self.best_win_ratio = 0.0
         # num of simulations used for the pure mcts, which is used as
