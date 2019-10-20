@@ -239,18 +239,25 @@ class PolicyValueNet():
             inputlayer = tl.layers.InputLayer(input_state, name='input')
 
             # 2. Common Networks Layers
-            # these layers designed by myself
+            # these layers are the same as paper's
             inputlayer = tl.layers.ZeroPad2d(inputlayer,2,name='zeropad2d')
             conv1 = tl.layers.Conv2d(inputlayer,
-                                          n_filter=64,
-                                          filter_size=(1, 1),
+                                          n_filter=256,
+                                          filter_size=(3, 3),
                                           strides=(1, 1),
                                           padding='SAME',
                                           name='conv2d_1')
+
+            conv1 = tl.layers.BatchNormLayer(conv1,
+                                                  act=tf.nn.relu,
+                                                  is_train=is_train,
+                                                  name='bn_0')
+
             residual_layer = self.residual_block(incoming=conv1,
-                                                      out_channels=64,
+                                                      out_channels=256,
                                                       is_train=is_train,
                                                       nb_block=self.nb_block)
+
             # 3-1 Action Networks
             # these layers are the same as paper's
             action_conv = tl.layers.Conv2d(residual_layer,
