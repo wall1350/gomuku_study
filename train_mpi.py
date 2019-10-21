@@ -62,7 +62,7 @@ class TrainPipeline():
 
         # GPU setting
         # be careful to set your GPU using depends on GPUs' and CPUs' memory
-        if rank in {0,1,2,3,4,5,6,7}:
+        if rank in {0,1,2,3,4}:
             cuda = True
         elif rank in range(10,30):
             cuda = True
