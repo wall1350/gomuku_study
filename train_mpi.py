@@ -21,7 +21,7 @@ from policy_value_net_tensorlayer import  PolicyValueNet
 # or just
 # mpiexec -np 43 python -u train_mpi.py
 
-#　MPI setting
+# MPI setting
 comm = MPI.COMM_WORLD
 # size = comm.Get_size()
 rank = comm.Get_rank() # processing ID
@@ -58,11 +58,11 @@ class TrainPipeline():
         # once the win ratio risen to 1,
         # pure mcts playout num will plus 100 and win ratio reset to 0
         self.best_win_ratio = 0.0
-
+        self.log_file = open(os.path.join(os.getcwd(), 'log_file.txt'), 'w')
 
         # GPU setting
         # be careful to set your GPU using depends on GPUs' and CPUs' memory
-        if rank in {0,1,2}:
+        if rank in {0,1,2,3,4}:
             cuda = True
         elif rank in range(10,30):
             cuda = True
@@ -117,7 +117,7 @@ class TrainPipeline():
                                     winner))
                 # flip horizontally
                 equi_state = np.array([np.fliplr(s) for s in equi_state])
-                #这个np.fliplr like m[:, ::-1]
+                #這個np.fliplr like m[:, ::-1]
                 #https://docs.scipy.org/doc/numpy/reference/generated/numpy.fliplr.html
                 equi_mcts_prob = np.fliplr(equi_mcts_prob)
                 extend_data.append((equi_state,
@@ -195,6 +195,19 @@ class TrainPipeline():
                                                         entropy,
                                                         explained_var_old,
                                                         explained_var_new))
+                self.log_file.write('batch: {},length: {}'
+                      'kl:{:.5f},'
+                      'loss:{},'
+                      'entropy:{},'
+                      'explained_var_old:{:.3f},'
+                      'explained_var_new:{:.3f}'.format(i,
+                                                        len(mini_batch),
+                                                        kl,
+                                                        loss,
+                                                        entropy,
+                                                        explained_var_old,
+                                                        explained_var_new) + '\n')
+                self.log_file.flush()
 
         return loss, entropy
 
@@ -244,7 +257,7 @@ class TrainPipeline():
                                               print_prob=False)
             win_cnt[winner] += 1
         win_ratio = 1.0*(win_cnt[1] + 0.5*win_cnt[-1]) / n_games
-        #win for 1，tie for 0.5
+        #win for 1, tie for 0.5
         if self_evaluate:
             print("-"*150+"win: {}, lose: {}, tie:{}".format(win_cnt[1], win_cnt[2], win_cnt[-1]))
         else:
@@ -311,7 +324,7 @@ class TrainPipeline():
             for num in range(self.game_batch_num):
                 # print('begin!!!!!!!!!!!!!!!!!!!!!!!!!!!!!batch{}'.format(i),)
                 if rank not in {0,1,2}:
-                    #　self-play to collect data
+                    # self-play to collect data
                     if os.path.exists('model/best_policy.model.index'):
                         try:
                             # try to load current best model
@@ -471,6 +484,7 @@ class TrainPipeline():
 
 
         except KeyboardInterrupt:
+            self.log_file.close()
             print('\n\rquit')
 
 if __name__ == '__main__':
