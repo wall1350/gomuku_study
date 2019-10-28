@@ -437,10 +437,10 @@ class Game(object):
                 UI._draw_text("Human(white)", (925, 150), text_height=UI.TestSize)
 
             print('current_player', current_player)
+
             if current_player == 1:
                 UI.show_messages('Your turn')
             else:
-
                 UI.show_messages('AI\'s turn')
 
             for move_availables in self.board.availables:
@@ -515,18 +515,18 @@ class Game(object):
                     if winner != -1:
                         print("Game end. Winner is player", winner)
                         UI.add_score(winner)
-                        
+                        """
                         if winner == 1:
                             #UI.show_messages("Game end. Winner is 1 ")
                             UI._draw_text("Game end. Winner is  player 1 ", (500, 690), text_height=UI.TestSize)
                         elif winner == 2:
                             #UI.show_messages("Game end. Winner is 2 ")
                             UI._draw_text("Game end. Winner is player 2 ", (500, 690), text_height=UI.TestSize)
-
-                        
+                        """
                     else:
                         print("Game end. Tie")
-                        UI._draw_text("Game end. Tie ", (775, 750), text_height=UI.TestSize)
+                        #UI._draw_text("Game end. Tie ", (775, 750), text_height=UI.TestSize)
+                    UI._show_endmsg(winner) #結束提示
                     print(UI.score)
                     print()
 
