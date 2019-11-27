@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sat Dec  8 16:16:04 2018
-
 @author: initial-h
 """
 
@@ -15,6 +14,8 @@ from game_board import Board,Game
 from mcts_pure import MCTSPlayer as MCTS_Pure
 from mcts_alphaZero import MCTSPlayer
 from policy_value_net_tensorlayer import  PolicyValueNet
+import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 # import sys
 # sys.stdout.flush()
@@ -66,8 +67,8 @@ class TrainPipeline():
             cuda = True
         elif rank in range(10,30):
             cuda = True
-            os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-            os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+            #os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+            #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
         else:
             cuda = False
 
@@ -183,24 +184,28 @@ class TrainPipeline():
 
             if print_out and (steps<10 or (i%(steps//10)==0)):
                 # print some information, not too much
-                print('batch: {},length: {}'
+                print('time:{},'
+                      'batch: {},length: {}'
                       'kl:{:.5f},'
                       'loss:{},'
                       'entropy:{},'
                       'explained_var_old:{:.3f},'
-                      'explained_var_new:{:.3f}'.format(i,
+                      'explained_var_new:{:.3f}'.format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                                                        i,
                                                         len(mini_batch),
                                                         kl,
                                                         loss,
                                                         entropy,
                                                         explained_var_old,
                                                         explained_var_new))
-                self.log_file.write('batch: {},length: {}'
+                self.log_file.write('time:{},'
+                      'batch: {},length: {}'
                       'kl:{:.5f},'
                       'loss:{},'
                       'entropy:{},'
                       'explained_var_old:{:.3f},'
-                      'explained_var_new:{:.3f}'.format(i,
+                      'explained_var_new:{:.3f}'.format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                                                        i,
                                                         len(mini_batch),
                                                         kl,
                                                         loss,
