@@ -8,6 +8,10 @@ Created on Fri Dec  7 22:05:17 2018
 
 import numpy as np
 import copy
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 def softmax(x):
     probs = np.exp(x - np.max(x))
@@ -29,7 +33,10 @@ class TreeNode(object):
         self._n_visits = 0
         self._Q = 0
         self._u = 0
+        self.W = 0
+        self.v = 0
         self._P = prior_p # its the prior probability that action's taken to get this node
+        self.lock = False
 
     def expand(self, action_priors,add_noise):
         '''
@@ -61,37 +68,64 @@ class TreeNode(object):
                 if action not in self._children:
                     self._children[action] = TreeNode(self, prob)
 
-    def select(self, c_puct):
+    def select(self, c_puct, virtual_loss):
         '''
         Select action among children that gives maximum action value Q plus bonus u(P).
         Return: A tuple of (action, next_node)
         '''
-        return max(self._children.items(),
+        if self.lock == True:
+            return
+        action, node = max(self._children.items(),
                    key=lambda act_node: act_node[1].get_value(c_puct))
+        """for i in self._children.keys():
+            print(i,':',self._children[i])
+        print("========================================")
+        print("selected action:",action)"""
+        
+        node._n_visits += virtual_loss
+        node.W -= virtual_loss
+        
+        """while len(self._children)>1:
+            del_a, del_p = min(self._children.items(),key=lambda act_node: act_node[1]._Q+act_node[1].v)
+            self.del_tree_branch(del_p, c_puct)
+            self._children.pop(del_a)"""
+        
+        return action, node
 
-    def update(self, leaf_value):
+    def update(self, leaf_value, c_puct):
         '''
         Update node values from leaf evaluation.
         leaf_value: the value of subtree evaluation from the current player's
             perspective.
         '''
         self._n_visits += 1
+        self.v = leaf_value
         # update visit count
-        self._Q += 1.0*(leaf_value - self._Q) / self._n_visits
+        self.W += leaf_value
+        self._Q = self.W / self._n_visits
+        #self._Q += 1.0*(leaf_value - self._Q) / self._n_visits
+        
         # Update Q, a running average of values for all visits.
         # there is just: (v-Q)/(n+1)+Q = (v-Q+(n+1)*Q)/(n+1)=(v+n*Q)/(n+1)
 
-    def update_recursive(self, leaf_value):
+    def update_recursive(self, leaf_value, c_puct, update_u=False):
         '''
         Like a call to update(), but applied recursively for all ancestors.
         '''
         # If it is not root, this node's parent should be updated first.
         if self._parent:
-            self._parent.update_recursive(-leaf_value)
+            self._parent.update_recursive(-leaf_value, c_puct, update_u)
+            if update_u:
+                self._u = (1 * self._P * np.sqrt(self._parent._n_visits) / (1 + self._n_visits))
             # every step for revursive update,
             # we should change the perspective by the way of taking the negative
-        self.update(leaf_value)
-
+        self.update(leaf_value, c_puct)
+        
+    """def del_tree_branch(self, p, c_puct):
+        if p.is_leaf():
+            p._parent = None
+            return"""
+        
     def get_value(self, c_puct):
         '''
         Calculate and return the value for this node.
@@ -142,6 +176,9 @@ class MCTS(object):
         # it's 5 in paper and don't change here,but maybe a better number exists in gomoku domain
         self._n_playout = n_playout # times of tree search
         self._is_selfplay = is_selfplay
+        
+        self.lock = False
+        self.virtual_loss = 1
 
     def _playout(self, state):
         '''
@@ -156,51 +193,102 @@ class MCTS(object):
             if node.is_leaf():
                 break
             # Greedily select next move.
-            action, node = node.select(self._c_puct)
-            # print('move in tree...',action)
+            action, node = node.select(self._c_puct, self.virtual_loss)
+            #print('move in tree...',action)
             state.do_move(action)
             # deep+=1
         # print('-------------deep is :',deep)
 
-        # Evaluate the leaf using a network which outputs a list of
-        # (action, probability) tuples p and also a score v in [-1, 1]
-        # for the current player.
-        action_probs, leaf_value = self._policy_value_fn(state,self._action_fc,self._evaluation_fc)
-        # Check for end of game.
-        end, winner = state.game_end()
-        if not end:
-            # print('expand move:',state.width*state.height-len(state.availables),node._n_visits)
-            node.expand(action_probs,add_noise=self._is_selfplay)
-        else:
-            # for end state，return the "true" leaf_value
-            # print('end!!!',node._n_visits)
-            if winner == -1:  # tie
-                leaf_value = 0.0
+        while(1):
+            # Evaluate the leaf using a network which outputs a list of
+            # (action, probability) tuples p and also a score v in [-1, 1]
+            # for the current player.
+            action_probs, leaf_value = self._policy_value_fn(state,self._action_fc,self._evaluation_fc)
+            # Check for end of game.
+            end, winner = state.game_end()
+            is_async = False
+            update_u = False
+            if not end:
+                # print('expand move:',state.width*state.height-len(state.availables),node._n_visits)
+                if self.lock == False:
+                    self.lock = True
+                    self.lock = comm.bcast(self.lock, root=rank)
+                    is_async = True
+                node.expand(action_probs,add_noise=self._is_selfplay)
             else:
-                leaf_value = (
-                    1.0 if winner == state.get_current_player() else -1.0
-                )
+                # for end state，return the "true" leaf_value
+                # print('end!!!',node._n_visits)
+                if winner == -1:  # tie
+                    leaf_value = 0.0
+                else:
+                    leaf_value = (
+                        1.0 if winner == state.get_current_player() else -1.0
+                    )
+                    temp_node = node
+                    #print("enter while 2-1")
+                    while temp_node!=None:
+                        n = {}
+                        if temp_node._parent:
+                            for i in temp_node._parent._children.keys():
+                                if temp_node._parent._children[i] == temp_node:                                
+                                    n[i] = temp_node
+                            temp_node._parent._children.clear()
+                            temp_node._parent._children = n
+                            temp_node = temp_node._parent
+                        else:
+                            break
+                        n = None
+                    #print("exit while 2-1")
+                    update_u = True
+                    
+            # Update value and visit count of nodes in this traversal.
+            node.update_recursive(-leaf_value, self._c_puct, update_u)
+            
+            node._n_visits -= self.virtual_loss
+            node.W += self.virtual_loss
+            
+            if self.lock and is_async:
+                self.lock = False
+                self.lock = comm.bcast(self.lock, root=rank)
 
-        # Update value and visit count of nodes in this traversal.
-        node.update_recursive(-leaf_value)
-        # no rollout here
+            if self.lock == False: #sync lock
+                break
+            while self.lock:  #sync lock
+                if node.is_leaf():
+                    break
+                # Greedily select next move.
+                action, node = node.select(self._c_puct, self.virtual_loss)
+                #print('move in tree...',action)
+                state.do_move(action)
 
-    def get_move_visits(self, state):
+    def get_move_visits(self, state, same_p_move=[]):
         '''
         Run all playouts sequentially and return the available actions and
         their corresponding visiting times.
         state: the current game state
         '''
+        bk = False
         for n in range(self._n_playout):
-            # print('playout:',n)
             state_copy = copy.deepcopy(state)
             self._playout(state_copy)
+            if same_p_move!=[]:
+                for i in range(1,len(same_p_move)):
+                    if self._root._children[same_p_move[i]] != same_p_move[0]:
+                        bk = True
+                        break
+                if bk:
+                    break
 
         # calc the visit counts at the root node
         act_visits = [(act, node._n_visits)
                       for act, node in self._root._children.items()]
+        """print('*** act_visits ***')
+        for i in range(0,len(act_visits)):
+            print('r:{}, {}:{}, '.format(rank,act_visits[i][0],act_visits[i][1]),end=' ')
+            if (i+1)%3==0:
+                print()
+        print()"""
         acts, visits = zip(*act_visits)
-
         return acts, visits
 
     def update_with_move(self, last_move):
@@ -252,7 +340,7 @@ class MCTSPlayer(object):
         '''
         self.mcts.update_with_move(-1)
 
-    def get_action(self,board,is_selfplay,print_probs_value):
+    def get_action(self,board,is_selfplay,print_probs_value,same_p_move=[]):
         '''
         get an action by mcts
         do not discard all the tree and retain the useful part
@@ -262,7 +350,7 @@ class MCTSPlayer(object):
         move_probs = np.zeros(board.width * board.height)
         if len(sensible_moves) > 0:
             if is_selfplay:
-                acts, visits = self.mcts.get_move_visits(board)
+                acts, visits = self.mcts.get_move_visits(board,same_p_move)
                 if board.width * board.height - len(board.availables) <= self.first_n_moves:
                     # For the first n moves of each game, the temperature is set to τ = 1
                     temp = 1
@@ -279,12 +367,19 @@ class MCTSPlayer(object):
             else:
                 self.mcts.update_with_move(board.last_move)
                 # update the tree with opponent's move and then do mcts from the new node
+                acts, visits = self.mcts.get_move_visits(board,same_p_move)
 
-                acts, visits = self.mcts.get_move_visits(board)
                 temp = 1e-3
                 # always choose the most visited move
                 probs = softmax(1.0 / temp * np.log(np.array(visits) + 1e-10))
+                """print('*** probs ***')
+                for i in range(0,len(probs)):
+                    print('r:{}, {}:{}'.format(rank,acts[i],probs[i]),end=' ')
+                    if (i+1)%3==0:
+                        print()
+                print()"""
                 move = np.random.choice(acts, p=probs)
+                #print('rank:',rank,', r_move:',move)
 
                 self.mcts.update_with_move(move)
                 # update the tree with self move
@@ -303,7 +398,6 @@ class MCTSPlayer(object):
                     for x in p:
                         print("{0:6}".format(x), end='')
                     print('\r')"""
-
             return move,move_probs
 
         else:

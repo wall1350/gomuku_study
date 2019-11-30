@@ -10,7 +10,10 @@ import tensorlayer as tl
 from tensorlayer.layers import *
 import os
 import numpy as np
+from mpi4py import MPI
 
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 class PolicyValueNet():
     def __init__(self, board_width, board_height,block, init_model=None, transfer_model=None,cuda=False):
@@ -27,6 +30,8 @@ class PolicyValueNet():
 
         self.board_width = board_width
         self.board_height = board_height
+        
+        self.lock = False
 
         # Make a session
         self.session = tf.InteractiveSession()
@@ -174,10 +179,19 @@ class PolicyValueNet():
         # evaluation, (di(p), v) = fθ(di(sL)),
         # where di is a dihedral reflection or rotation
         # selected uniformly at random from i in [1..8]
-
+        #print("fc: policy_value_fn_random")
         legal_positions = board.availables
-        current_state = np.ascontiguousarray(board.current_state().reshape(
-            -1, self.planes_num, self.board_width, self.board_height))
+        
+        while 1:
+            if self.lock==False:
+                self.lock = True
+                self.lock = comm.bcast(self.lock, root=rank)
+                current_state = np.ascontiguousarray(board.current_state().reshape(
+                    -1, self.planes_num, self.board_width, self.board_height))
+                self.lock = False
+                self.lock = comm.bcast(self.lock, root=rank)
+                break
+            
 
         # print('current state shape',current_state.shape)
 
