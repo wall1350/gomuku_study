@@ -30,16 +30,12 @@ from collections import Counter
 from GUI_v1_4 import GUI
 import tensorflow as tf
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-import time
 # how  to run :
 # mpiexec -np 2 python -u human_play_mpi.py
 
 #win-loss record
 win_loss_list=[]
 show_start = 0
-
-#is do move or not
-
 #　MPI setting
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -318,16 +314,8 @@ def forbidden(h, w, player=1):
         return 4
 
 def start_play_with_UI(start_player=0):
-
-
-
     # run a gomoku game with AI in GUI
-
-    global show_start #using glbal var
-    global win_loss_list
     bcast_move = -1
-    tStart = time.time()#計時開始
-    print("tStart",tStart)
 
     # init game and player
     board.init_board()
@@ -344,21 +332,14 @@ def start_play_with_UI(start_player=0):
 
         if rank == 0:
 
-            for i in range(0, 8, 1):
-
-                if (i <len(win_loss_list)):
-                    UI._draw_text("       ", (730, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                    UI._draw_text("       ", (820, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                    UI._draw_text("                  ", (935, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                    #pygame.draw.line(UI.screen, UI._button_color, (705, 320+(i%8)*40), (995, 320+(i%8)*40),1)
-
             for i in range(show_start, show_start+8, 1):
 
                 if (i <len(win_loss_list)):
-                    UI._draw_text(win_loss_list[i][0], (730, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                    UI._draw_text(win_loss_list[i][1], (820, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                    UI._draw_text(win_loss_list[i][2], (935, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                    #pygame.draw.line(UI.screen, UI._button_color, (705, 320+(i%8)*40), (995, 320+(i%8)*40),1)
+                    UI._draw_text(win_loss_list[i][0], (730, 305+i*40),backgroud_color=(255,255,255), text_height=30)
+                    UI._draw_text(win_loss_list[i][1], (820, 305+i*40),backgroud_color=(255,255,255), text_height=30)
+                    UI._draw_text(win_loss_list[i][2], (930, 305+i*40),backgroud_color=(255,255,255), text_height=30)
+                    pygame.draw.line(UI.screen, UI._button_color, (705, 320+i*40), (995, 320+i*40),1)
+
 
             for move_availables in board.availables:
                 i, j = board.move_to_location(move_availables)
@@ -380,6 +361,7 @@ def start_play_with_UI(start_player=0):
             if rank == 0:
                 # print prior probabilities
                 gather_move, move_probs = player2.get_action(board=board, is_selfplay=False, print_probs_value=True)
+
             else:
                 gather_move, move_probs = player2.get_action(board=board, is_selfplay=False, print_probs_value=False)
 
@@ -397,19 +379,14 @@ def start_play_with_UI(start_player=0):
             if rank == 0:
                 inp = UI.get_input()
                 if inp[0] == 'move' and not end:
-
                     if type(inp[1]) != int:
                         bcast_move = UI.loc_2_move(inp[1])
                     else:
                         bcast_move = inp[1]
 
                 elif inp[0] == 'RestartGame':
-                    tStart = time.time()#計時開始
-                    print("tStart",tStart)
                     UI.restart_game()
                     restart = SP+1
-
-
 
                 elif inp[0] == 'ResetScore':
                     UI.reset_score()
@@ -420,44 +397,33 @@ def start_play_with_UI(start_player=0):
 
                 elif inp[0] == 'SwitchPlayer':
                     SP = (SP + 1) % 2
-                    win_loss_list=[]
                     UI.restart_game(False)
                     UI.reset_score()
+                    win_loss_list=[]
                     restart = SP+1
-
                 elif inp[0] == 'NextPage':
-                    print('NextPage1')
-                    print("show_start ",show_start)
-                    if (show_start + 8) < len(win_loss_list):
+                    if show_start + 8 < len(win_loss_list):
                         show_start = show_start+8
-                        print('NextPage2')
-                    continue
-
+                        continue
                 elif inp[0] == 'LastPage':
-                    print('LastPage1')
-                    print("show_start ",show_start)
-                    if (show_start - 8) >= 0:
+                    if show_start - 8 > 0:
                         show_start = show_start-8
-                        print('LastPage2')
-                    continue
-
+                        continue
                 else:
-                    print('ignored inp:', inp)
+                    # print('ignored inp:', inp)
                     continue
 
         restart = comm.bcast(restart, root=0)
 
         if not end and not restart:
-
             # bcast the move to other ranks
             bcast_move = comm.bcast(bcast_move, root=0)
             # print('!'*10,rank,bcast_move)
             if rank == 0:
-                #print("board.move_to_location",board.move_to_location(bcast_move))
+#                print("board.move_to_location",board.move_to_location(bcast_move))
                 UI.render_step(bcast_move, board.current_player)
 
-            #print('bcast_move',board.current_player, bcast_move)
-
+            print('bcast_move',board.current_player, bcast_move)
             # human do move
             board.do_move(bcast_move)
 
@@ -472,52 +438,25 @@ def start_play_with_UI(start_player=0):
                         #print("Game end. Winner is ", winner)
                         UI.add_score(winner)
                         UI._show_endmsg(winner) #結束提示
-                        tEnd = time.time()#計時結束
-
-                        timeString=""
-                        timeTotal = (tEnd - tStart)
-
-                        if(timeTotal>3600):
-                            timeString=timeString+str(int(timeTotal//3600))+":"
-                            timeTotal = timeTotal % 3600
-                        else:
-                            timeString=timeString+"0:"
-
-                        if(timeTotal>60):
-                            timeString=timeString+str(int(timeTotal//60))+":"
-                            timeTotal = timeTotal % 60
-                        else:
-                            timeString=timeString+"0:"
-
-                        if((tEnd - tStart)>0):
-                            timeString=timeString+str(round(timeTotal))
-                        else:
-                            timeString=timeString+"0"
 
                         now_list=[]
                         now_list.append(UI.round_counter)
                         now_list.append(str(winner))
-                        now_list.append(timeString)
+                        now_list.append('12:87:23')
                         win_loss_list.append(now_list)
                         print(win_loss_list)
-
-                        for i in range(0, 8, 1):
-                            if (i <len(win_loss_list)):
-                                UI._draw_text("       ", (730, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                                UI._draw_text("       ", (820, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                                UI._draw_text("                  ", (935, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-
 
                         for i in range(show_start, show_start+8, 1):
 
                             if (i <len(win_loss_list)):
-                                UI._draw_text(win_loss_list[i][0], (730, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                                UI._draw_text(win_loss_list[i][1], (820, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                                UI._draw_text(win_loss_list[i][2], (935, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                                #pygame.draw.line(UI.screen, UI._button_color, (705, 320+(i%8)*40), (995, 320+(i%8)*40),1)
+                                UI._draw_text(win_loss_list[i][0], (730, 305+i*40),backgroud_color=(255,255,255), text_height=30)
+                                UI._draw_text(win_loss_list[i][1], (820, 305+i*40),backgroud_color=(255,255,255), text_height=30)
+                                UI._draw_text(win_loss_list[i][2], (930, 305+i*40),backgroud_color=(255,255,255), text_height=30)
+                                pygame.draw.line(UI.screen, UI._button_color, (705, 320+i*40), (995, 320+i*40),1)
 
                     else:
                         print("Game end. Tie")
+
         else:
             if restart:
                 if restart == 'exit':
