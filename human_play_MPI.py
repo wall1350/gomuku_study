@@ -413,6 +413,11 @@ def start_play_with_UI(start_player=0):
 
                 elif inp[0] == 'ResetScore':
                     UI.reset_score()
+                    win_loss_list=[]
+                    for i in range(0, 8, 1):
+                        UI._draw_text("       ", (730, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                        UI._draw_text("       ", (820, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                        UI._draw_text("                  ", (935, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
                     continue
 
                 elif inp[0] == 'quit':
@@ -421,6 +426,7 @@ def start_play_with_UI(start_player=0):
                 elif inp[0] == 'SwitchPlayer':
                     SP = (SP + 1) % 2
                     win_loss_list=[]
+                    tStart = time.time()#計時開始
                     UI.restart_game(False)
                     UI.reset_score()
                     restart = SP+1
