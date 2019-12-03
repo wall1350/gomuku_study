@@ -361,7 +361,7 @@ def start_play_with_UI(start_player=0):
                 if (i <len(win_loss_list)):
                     UI._draw_text("       ", (730, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
                     UI._draw_text("       ", (820, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                    UI._draw_text("                  ", (935, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                    UI._draw_text("                  ", (935, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
                     #pygame.draw.line(UI.screen, UI._button_color, (705, 320+(i%8)*40), (995, 320+(i%8)*40),1)
 
             for i in range(show_start, show_start+8, 1):
@@ -429,9 +429,9 @@ def start_play_with_UI(start_player=0):
                     UI.reset_score()
                     win_loss_list=[]
                     for i in range(0, 8, 1):
-                        UI._draw_text("       ", (730, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                        UI._draw_text("       ", (820, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                        UI._draw_text("                  ", (935, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                        UI._draw_text("       ", (730, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                        UI._draw_text("       ", (820, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                        UI._draw_text("                  ", (935, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
                     continue
 
                 elif inp[0] == 'quit':
@@ -523,17 +523,17 @@ def start_play_with_UI(start_player=0):
 
                         for i in range(0, 8, 1):
                             if (i <len(win_loss_list)):
-                                UI._draw_text("       ", (730, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                                UI._draw_text("       ", (820, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                                UI._draw_text("                  ", (935, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                                UI._draw_text("       ", (730, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                                UI._draw_text("       ", (820, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                                UI._draw_text("                  ", (935, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
 
 
                         for i in range(show_start, show_start+8, 1):
 
                             if (i <len(win_loss_list)):
-                                UI._draw_text(win_loss_list[i][0], (730, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                                UI._draw_text(win_loss_list[i][1], (820, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                                UI._draw_text(win_loss_list[i][2], (935, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                                UI._draw_text(win_loss_list[i][0], (730, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                                UI._draw_text(win_loss_list[i][1], (820, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                                UI._draw_text(win_loss_list[i][2], (935, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
                                 #pygame.draw.line(UI.screen, UI._button_color, (705, 320+(i%8)*40), (995, 320+(i%8)*40),1)
 
                     else:
