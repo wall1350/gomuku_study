@@ -66,17 +66,17 @@ class GUI:
         #     raise ValueError('board size too small')
 
         self.BoardSize = bs
-        self.ScreenSize = (1020,710)
+        self.ScreenSize = (1020,680)
         print("ScreenSize",self.ScreenSize)
         self.screen = pygame.display.set_mode(self.ScreenSize, 0, 32)
         pygame.display.set_caption('AlphaZero_Gomoku R')
 
         # button areas
-        self.areas['LastPage'] = Rect(775, 605, 60, 30)
-        self.areas['NextPage'] = Rect(890, 605, 60, 30)
-        self.areas['SwitchPlayer'] = Rect(704, 640, self.UnitSize*2, self.UnitSize)
-        self.areas['ResetScore'] = Rect(810, 640, self.UnitSize*2, self.UnitSize)
-        self.areas['RestartGame'] = Rect(916, 640, self.UnitSize*2, self.UnitSize)
+        self.areas['LastPage'] = Rect(755, 570, 80, 40)
+        self.areas['NextPage'] = Rect(865, 570, 80, 40)
+        self.areas['SwitchPlayer'] = Rect(700, 630, self.UnitSize*2, self.UnitSize)
+        self.areas['ResetScore'] = Rect(810, 630, self.UnitSize*2, self.UnitSize)
+        self.areas['RestartGame'] = Rect(920, 630, self.UnitSize*2, self.UnitSize)
 
         board_lenth = self.UnitSize * self.BoardSize
         self.areas['board'] = Rect(self.UnitSize, self.UnitSize, board_lenth, board_lenth)
@@ -228,23 +228,23 @@ class GUI:
         """
         if messages:
             self.messages = messages
-        pygame.draw.rect(self.screen, self._background_color, (700, 80, 150, 20))
+        pygame.draw.rect(self.screen, self._background_color, (700, 30, 150, 20))
         self._draw_round(False)
-        self._draw_text(self.messages, (745, 90), text_height=30)
+        self._draw_text(self.messages, (745, 40), text_height=30)
         self._draw_score()
 
     def _draw_score(self, update=True):
         score = 'Score: ' + str(self.score[0]) + ' : ' + str(self.score[1])
-        self._draw_text(score, (940, 90),
+        self._draw_text(score, (940, 40),
                         backgroud_color=self._background_color, text_height=30)
         if update:
             pygame.display.update()
 
     def _draw_round(self, update=True):
 
-        self._draw_text('History:', (745, 205),backgroud_color=self._background_color, text_height=30)
+        self._draw_text('History', (745, 155),backgroud_color=self._background_color, text_height=30)
 
-        self._draw_text('Round: ' + str(self.round_counter), (950, 205),backgroud_color=self._background_color, text_height=30)
+        self._draw_text('Round: ' + str(self.round_counter), (950, 155),backgroud_color=self._background_color, text_height=30)
 
         if update:
             pygame.display.update()
@@ -363,15 +363,15 @@ class GUI:
 
         # the first para is the picture item , the second one is the position in the flame
         self.screen.blit(background_image, (0, 0))
-        self.screen.blit(panel_image1, (705, 100))
-        self.screen.blit(panel_image2, (705, 240))
+        self.screen.blit(panel_image1, (705, 50))
+        self.screen.blit(panel_image2, (705, 190))
 
 
-        self._draw_text("Player1", (770, 115), text_height=25,font_color=(255,255,255))
-        self._draw_text("Player2", (925, 115),text_height=25,font_color=(255,255,255))
+        self._draw_text("Player1", (770, 65), text_height=25,font_color=(255,255,255))
+        self._draw_text("Player2", (925, 65),text_height=25,font_color=(255,255,255))
 
-        self._draw_text("Human(black)", (755, 150), text_height=20)
-        self._draw_text("AlphaZero(white)", (925, 150),text_height=20)
+        # self._draw_text("Human(black)", (755, 100), text_height=20)
+        # self._draw_text("AlphaZero(white)", (925, 100),text_height=20)
 
         # draw board
         board_lenth = self.UnitSize * self.BoardSize
@@ -389,21 +389,22 @@ class GUI:
             self._draw_text(i, (start + self.UnitSize, self.UnitSize / 2), text_height=self.TestSize)  # 横的
 
         # draw History
-        self._draw_text('History', (745, 205),backgroud_color=self._background_color, text_height=30)
+        # self._draw_text('History', (745, 155),backgroud_color=self._background_color, text_height=30)
 
-        self._draw_text('NO.', (730, 265),backgroud_color=(255,255,255), text_height=30)
-        self._draw_text('Winner', (820, 265),backgroud_color=(255,255,255), text_height=30)
-        self._draw_text('Time', (930, 265),backgroud_color=(255,255,255), text_height=30)
+        self._draw_text('NO.', (730, 215),backgroud_color=(255,255,255), text_height=30)
+        self._draw_text('Winner', (820, 215),backgroud_color=(255,255,255), text_height=30)
+        self._draw_text('Time', (930, 215),backgroud_color=(255,255,255), text_height=30)
+
+        pygame.draw.line(self.screen, self._button_color, (705, 170), (995, 170),1)
+        pygame.draw.line(self.screen, self._button_color, (705, 230), (995, 230),1)
 
         for i in range(0, 8, 1):
             #self._draw_text(str(i), (730, 265+i*40),backgroud_color=(255,255,255), text_height=30)
             #self._draw_text('computer', (820, 265+i*40),backgroud_color=(255,255,255), text_height=30)
             #self._draw_text('12:87:23', (930, 265+i*40),backgroud_color=(255,255,255), text_height=30)
-            pygame.draw.line(self.screen, self._button_color, (705, 320+(i%8)*40), (995, 320+(i%8)*40),1)
+            pygame.draw.line(self.screen, self._button_color, (705, 270+(i%8)*40), (995, 270+(i%8)*40),1)
             #pygame.draw.line(UI.screen, UI._button_color, (705, 320+(i%8)*40), (995, 320+(i%8)*40),1)
-        pygame.draw.line(self.screen, self._button_color, (705, 220), (995, 220),1)
 
-        pygame.draw.line(self.screen, self._button_color, (705, 280), (995, 280),1)
         # draw buttons
         for name in self.areas.keys():
             if name != 'board':

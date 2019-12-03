@@ -159,7 +159,7 @@ def start_play(start_player=0, is_shown=1):
 
         if rank == 0:
             # print move index
-#            print(board.move_to_location(bcast_move))
+			# print(board.move_to_location(bcast_move))
             if is_shown:
                 graphic(board=board)
 
@@ -178,7 +178,7 @@ def start_play(start_player=0, is_shown=1):
 
         if rank == 0:
             # gather ecah rank's move and get the most selected one
-#            print('list is', gather_move_list)
+			# print('list is', gather_move_list)
             bcast_move = Counter(gather_move_list).most_common()[0][0]
 
         # bcast the move to other ranks
@@ -190,7 +190,7 @@ def start_play(start_player=0, is_shown=1):
         # print('rank:', rank, board.availables)
 
         if rank == 0:
-#            print(board.move_to_location(bcast_move))
+		# print(board.move_to_location(bcast_move))
             if is_shown:
                 graphic(board=board)
         end, winner = board.game_end()
@@ -217,7 +217,7 @@ def start_play(start_player=0, is_shown=1):
         # print('rank:', rank, board.availables)
 
         if rank == 0:
-#            print(board.move_to_location(bcast_move))
+		#print(board.move_to_location(bcast_move))
             if is_shown:
                 graphic(board=board)
         end, winner = board.game_end()
@@ -340,24 +340,36 @@ def start_play_with_UI(start_player=0):
         SP = start_player
         UI = GUI(board.width)
 
+
+
     while True:
 
         if rank == 0:
 
+
+            if SP == 0:
+                print()
+                UI._draw_text("Human(black)", (765, 100), text_height=20)
+                UI._draw_text("AlphaZero(white)", (935, 100),text_height=20)
+            else:
+                print()
+                UI._draw_text("AlphaZero(black)", (765, 100), text_height=20)
+                UI._draw_text("Human(white)", (935, 100),text_height=20)
+
             for i in range(0, 8, 1):
 
                 if (i <len(win_loss_list)):
-                    UI._draw_text("       ", (730, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                    UI._draw_text("       ", (820, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                    UI._draw_text("       ", (730, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                    UI._draw_text("       ", (820, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
                     UI._draw_text("                  ", (935, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
                     #pygame.draw.line(UI.screen, UI._button_color, (705, 320+(i%8)*40), (995, 320+(i%8)*40),1)
 
             for i in range(show_start, show_start+8, 1):
 
                 if (i <len(win_loss_list)):
-                    UI._draw_text(win_loss_list[i][0], (730, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                    UI._draw_text(win_loss_list[i][1], (820, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
-                    UI._draw_text(win_loss_list[i][2], (935, 305+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                    UI._draw_text(win_loss_list[i][0], (730, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                    UI._draw_text(win_loss_list[i][1], (820, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
+                    UI._draw_text(win_loss_list[i][2], (935, 255+(i%8)*40),backgroud_color=(255,255,255), text_height=30)
                     #pygame.draw.line(UI.screen, UI._button_color, (705, 320+(i%8)*40), (995, 320+(i%8)*40),1)
 
             for move_availables in board.availables:
@@ -368,10 +380,12 @@ def start_play_with_UI(start_player=0):
                     print("ban at ",move_availables)
                     UI._draw_ban((i, j))
 
+
             if current_player_num == 0:
                 UI.show_messages('Your turn')
             else:
                 UI.show_messages('AI\'s turn')
+
 
         # AI's turn
         if current_player_num == 1 and not end:
@@ -388,7 +402,7 @@ def start_play_with_UI(start_player=0):
 
             if rank == 0:
                 # gather ecah rank's move and get the most selected one
-#                print('list is', gather_move_list)
+				# print('list is', gather_move_list)
                 bcast_move = Counter(gather_move_list).most_common()[0][0]
                 # print(board.move_to_location(bcast_move))
 
