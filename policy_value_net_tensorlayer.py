@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sat Dec  8 13:02:14 2018
-
 @author: initial-h
 """
 
@@ -319,7 +318,7 @@ class PolicyValueNet():
                                               name='resnet_bn_' + str(i) + '_1')
             resnet = tl.layers.Conv2d(resnet, n_filter=out_channels, filter_size=(3, 3), strides=(1, 1),
                                       padding='SAME', name='resnet_conv2d_' + str(i) + '_2')
-            resnet = tl.layers.BatchNormLayer(resnet, is_train=is_train, name='resnet_bn_' + str(i) + '_2')
+            resnet = tl.layers.BatchNormLayer(resnet, is_train=is_train,name='resnet_bn_' + str(i) + '_2')
 
             resnet = tl.layers.ElementwiseLayer([resnet, identity], combine_fn=tf.add,
                                                 name='elementwise_layer_' + str(i))

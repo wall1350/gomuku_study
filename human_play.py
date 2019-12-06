@@ -14,7 +14,8 @@ import time
 from os import path
 import os
 from collections import defaultdict
-
+import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 class Human(object):
     """
     human player
@@ -69,7 +70,7 @@ def run(start_player=0,is_shown=1):
                                    action_fc=best_policy.action_fc_test,
                                    evaluation_fc=best_policy.evaluation_fc2_test,
                                    c_puct=5,
-                                   n_playout=10,
+                                   n_playout=1,
                                    is_selfplay=False)
 
     # alpha_zero_player_oppo = MCTSPlayer(policy_value_function=best_policy.policy_value_fn_random,
