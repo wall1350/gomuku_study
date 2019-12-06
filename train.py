@@ -42,7 +42,6 @@ class TrainPipeline():
         # num of simulations used for the pure mcts, which is used as
         # the opponent to evaluate the trained policy
         self.pure_mcts_playout_num = 200
-        self.log_file = open(os.path.join(os.getcwd(), 'log_file.txt'), 'w')
         if (init_model is not None) and os.path.exists(init_model+'.index'):
             # start training from an initial policy-value net
             self.policy_value_net = PolicyValueNet(self.board_width,self.board_height,block=self.resnet_block,init_model=init_model,cuda=True)
@@ -161,19 +160,7 @@ class TrainPipeline():
                                                         entropy,
                                                         explained_var_old,
                                                         explained_var_new))
-                self.log_file.write('batch: {},length: {}'
-                      'kl:{:.5f},'
-                      'loss:{},'
-                      'entropy:{},'
-                      'explained_var_old:{:.3f},'
-                      'explained_var_new:{:.3f}'.format(i,
-                                                        len(mini_batch),
-                                                        kl,
-                                                        loss,
-                                                        entropy,
-                                                        explained_var_old,
-                                                        explained_var_new) + '\n')
-                self.log_file.flush()
+
         return loss, entropy
 
     def policy_evaluate(self, n_games=10):
@@ -268,7 +255,6 @@ class TrainPipeline():
                                 self.best_win_ratio = 0.0
 
         except KeyboardInterrupt:
-            self.log_file.close()
             print('\n\rquit')
 
 if __name__ == '__main__':

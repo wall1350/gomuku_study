@@ -10,18 +10,6 @@ from collections import deque
 from GUI_v1_4 import GUI
 import pygame
 from pygame.locals import *
-from mpi4py import MPI
-from collections import Counter
-import time
-
-# how  to run :
-# mpiexec -np 2 python -u human_play_mpi.py
-
-#　MPI setting
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-
-
 
 class Board(object):
     '''
@@ -299,6 +287,12 @@ class Game(object):
             buffer[3] = buffer[3][:count] + str(states.get(i * width + j, 0)) + buffer[3][count+1:]
             buffer[3] = buffer[3][:5] + str(player) + buffer[3][6:]
 
+        """print()
+        print(buffer[0])
+        print(buffer[1])
+        print(buffer[2])
+        print(buffer[3])
+        print()"""
 
         for i in range(4):
             judge = 0
@@ -310,7 +304,8 @@ class Game(object):
         for i in range(4):
             before = restricted[1]
             restricted[1] = restricted[1]+1 if(buffer[i].find("011110")!=-1 or buffer[i].find("011112")!=-1 or buffer[i].find("211110")!=-1 or buffer[i].find("011113")!=-1 or buffer[i].find("311110")!=-1) else restricted[1]
-
+            #if buffer[i].find("10111") != -1:
+            #    restricted[1] = restricted[1] if(buffer[i].find("1101110")!=-1 or buffer[i].find("0101111")!=-1 or buffer[i].find("1101111")!=-1) else restricted[1]+1
             restricted[1] = restricted[1]+1 if(buffer[i].find("10111") != -1) else restricted[1]
             if buffer[i].find("11011") != -1:
                 if(not (buffer[i].find("1110110")!=-1 or buffer[i].find("0110111")!=-1 or buffer[i].find("1110111")!=-1)):
@@ -319,7 +314,9 @@ class Game(object):
                     if(not (buffer[i].find("1110110", buffer[i].find("11011")+1)!=-1 or buffer[i].find("0110111", buffer[i].find("11011")+1)!=-1 or buffer[i].find("1110111", buffer[i].find("11011")+1)!=-1)):
                         if buffer[i].find("11011", buffer[i].find("11011")+1) != -1:
                             restricted[1] = restricted[1]+1
-
+                            #print(i, buffer[i].find("11011", buffer[i].find("11011")+1))
+            #if buffer[i].find("11101") != -1:
+            #    restricted[1] = restricted[1] if(buffer[i].find("1111010")!=-1 or buffer[i].find("0111011")!=-1 or buffer[i].find("1111011")!=-1) else restricted[1]+1
             restricted[1] = restricted[1]+1 if(buffer[i].find("11101") != -1) else restricted[1]
             """print('before: ', restricted[1])"""
             if restricted[1] - before > 1:
@@ -446,95 +443,98 @@ class Game(object):
                 UI._draw_text("AlphaZero(black)", (775, 150), text_height=UI.TestSize)
                 UI._draw_text("Human(white)", (925, 150), text_height=UI.TestSize)
 
-            print("rank=",rank)
-            if rank == 0:
-                print("rank0 = ",rank)
-                for move_availables in self.board.availables:
-                    i, j = self.board.move_to_location(move_availables)
+            print('current_player', current_player)
+            if current_player == 1:
+                UI.show_messages('Your turn')
+            else:
+
+                UI.show_messages('AI\'s turn')
+
+            for move_availables in self.board.availables:
+                i, j = self.board.move_to_location(move_availables)
+                ban = self.forbidden(i, j)
+
+                if (ban == 1 or ban == 3 or ban == 4) and not end:
+                    print("ban at ",move_availables)
+                    UI._draw_ban((i, j))
+
+            if current_player == 2 and not end:                
+                move, move_probs,visits = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
+                if current_player == SP:
+                    availables = [i for i in self.board.availables]
+
+                    i, j = self.board.move_to_location(move)
                     ban = self.forbidden(i, j)
-
-                    if (ban == 1 or ban == 3 or ban == 4) and not end:
-                        print("ban at ",move_availables)
-                        UI._draw_ban((i, j))
-
-
-                if current_player == 2 and not end:
-                    move, move_probs = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
-                    if current_player == SP:
-                        availables = [i for i in self.board.availables]
-
-
+                    while ban == 1 or ban == 3 or ban == 4:
+                        print("禁手!!", i, j)
+                        self.board.availables.remove(move)
+                        move, move_probs, visits = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
                         i, j = self.board.move_to_location(move)
                         ban = self.forbidden(i, j)
-                        while ban == 1 or ban == 3 or ban == 4:
-                            print("禁手!!", i, j)
-                            self.board.availables.remove(move)
-                            move, move_probs = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
-                            i, j = self.board.move_to_location(move)
-                            ban = self.forbidden(i, j)
-                        self.board.availables = [i for i in availables]
+                    self.board.availables = [i for i in availables]
+            else:
+                inp = UI.get_input()
+                if inp[0] == 'move' and not end:
+                    move = inp[1]
+                    if current_player == SP:
+                        ban = self.forbidden(inp[2],inp[3])
+                        if ban == 1 or ban == 3 or ban == 4:
+                            continue
+                elif inp[0] == 'RestartGame':
+                    end = False
+                    current_player = SP
+                    self.board.init_board()
+                    UI.restart_game()
+                    AI.reset_player()
+                    continue
+                elif inp[0] == 'ResetScore':
+                    UI.reset_score()
+                    continue
+                elif inp[0] == 'quit':
+                    exit()
+                    continue
+                elif inp[0] == 'SwitchPlayer':
+                    end = False
+                    self.board.init_board()
+                    UI.restart_game(False)
+                    UI.reset_score()
+                    AI.reset_player()
+                    SP = self.board.players[0] if SP == self.board.players[1] else self.board.players[1]
+                    current_player = SP
+                    UI.SP=SP
+                    continue
                 else:
-                    inp = UI.get_input()
-                    if inp[0] == 'move' and not end:
-                        move = inp[1]
-                        if current_player == SP:
-                            ban = self.forbidden(inp[2],inp[3])
-                            if ban == 1 or ban == 3 or ban == 4:
-                                continue
-                    elif inp[0] == 'RestartGame':
-                        end = False
-                        current_player = SP
-                        self.board.init_board()
-                        UI.restart_game()
-                        AI.reset_player()
-                        continue
-                    elif inp[0] == 'ResetScore':
-                        UI.reset_score()
-                        continue
-                    elif inp[0] == 'quit':
-                        exit()
-                        continue
-                    elif inp[0] == 'NextPage':
-                        print('board NextPage')
-                        continue
-                    elif inp[0] == 'LastPage':
-                        print('board LastPage')
-                        continue
-                    elif inp[0] == 'SwitchPlayer':
-                        end = False
-                        self.board.init_board()
-                        UI.restart_game(False)
-                        UI.reset_score()
-                        AI.reset_player()
-                        SP = self.board.players[0] if SP == self.board.players[1] else self.board.players[1]
-                        current_player = SP
-                        UI.SP=SP
-                        continue
+                    # print('ignored inp:', inp)
+                    continue
+            # print('player %r move : %r'%(current_player,[move//self.board.width,move%self.board.width]))
+            if not end:
+                # print(move, type(move), current_player)
+                UI.render_step(move, self.board.current_player)
+                self.board.do_move(move)
+                UI.show_messages('AI\'s turn')
+                # print('move', move)
+                # print(2, self.board.get_current_player())
+                current_player = self.board.players[0] if current_player == self.board.players[1] else self.board.players[1]
+                # UI.render_step(move, current_player)
+                end, winner = self.board.game_end()
+                if end:
+                    if winner != -1:
+                        print("Game end. Winner is player", winner)
+                        UI.add_score(winner)
+                        
+                        if winner == 1:
+                            #UI.show_messages("Game end. Winner is 1 ")
+                            UI._draw_text("Game end. Winner is  player 1 ", (500, 690), text_height=UI.TestSize)
+                        elif winner == 2:
+                            #UI.show_messages("Game end. Winner is 2 ")
+                            UI._draw_text("Game end. Winner is player 2 ", (500, 690), text_height=UI.TestSize)
+
+                        
                     else:
-                        # print('ignored inp:', inp)
-                        continue
-
-                if not end:
-                    # print(move, type(move), current_player)
-                    UI.render_step(move, self.board.current_player)
-                    self.board.do_move(move)
-                    #UI.show_messages('AI\'s turn ')
-                    # print('move', move)
-                    # print(2, self.board.get_current_player())
-                    current_player = self.board.players[0] if current_player == self.board.players[1] else self.board.players[1]
-                    # UI.render_step(move, current_player)
-                    end, winner = self.board.game_end()
-                    if end:
-                        if winner != -1:
-                            print("Game end. Winner is player", winner)
-                            UI.add_score(winner)
-
-                        else:
-                            print("Game end. Tie")
-
-                        UI._show_endmsg(winner) #結束提示
-                        print("UI.score",UI.score)
-                        print()
+                        print("Game end. Tie")
+                        UI._draw_text("Game end. Tie ", (775, 750), text_height=UI.TestSize)
+                    print(UI.score)
+                    print()
 
     def start_self_play(self, player, is_shown=0):
         '''

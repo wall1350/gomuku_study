@@ -33,7 +33,7 @@ class GUI:
         self.score = [0, 0]
         self.BoardSize = board_size
         self.UnitSize = 40      # the basic size of all elements, try a different value!
-        self.TestSize = int(self.UnitSize * 0.5)
+        self.TestSize = int(self.UnitSize * 0.65)
         self.state = {}         # a dictionary for pieces on board. filled with move-player pairs, such as 34:1
         self.areas = {}         # a dictionary for button areas. filled with name-Rect pairs
         self.ScreenSize = None  # save the screen size for some calculation
@@ -44,7 +44,6 @@ class GUI:
         """self._background_color = (197, 227, 205)"""
         self._background_color = (247, 226, 193)
         self._board_color = (254, 185, 120)
-        self._button_color = (245, 154 , 35)
 
         self.reset(board_size)
 
@@ -66,17 +65,15 @@ class GUI:
         #     raise ValueError('board size too small')
 
         self.BoardSize = bs
-        self.ScreenSize = (1020,680)
+        self.ScreenSize = (1020,710)
         print("ScreenSize",self.ScreenSize)
         self.screen = pygame.display.set_mode(self.ScreenSize, 0, 32)
-        pygame.display.set_caption('AlphaZero_Gomoku R')
+        pygame.display.set_caption('AlphaZero_Gomoku')
 
         # button areas
-        self.areas['LastPage'] = Rect(755, 570, 80, 40)
-        self.areas['NextPage'] = Rect(865, 570, 80, 40)
-        self.areas['SwitchPlayer'] = Rect(700, 630, self.UnitSize*2, self.UnitSize)
-        self.areas['ResetScore'] = Rect(810, 630, self.UnitSize*2, self.UnitSize)
-        self.areas['RestartGame'] = Rect(920, 630, self.UnitSize*2, self.UnitSize)
+        self.areas['SwitchPlayer'] = Rect(704, 640, self.UnitSize*2, self.UnitSize)
+        self.areas['ResetScore'] = Rect(810, 640, self.UnitSize*2, self.UnitSize)
+        self.areas['RestartGame'] = Rect(916, 640, self.UnitSize*2, self.UnitSize)
 
         board_lenth = self.UnitSize * self.BoardSize
         self.areas['board'] = Rect(self.UnitSize, self.UnitSize, board_lenth, board_lenth)
@@ -208,10 +205,6 @@ class GUI:
             self.reset_score()
         elif inp[0] == 'quit':
             exit()
-        elif inp[0] == 'NextPage':
-            print('gui NextPage')
-        elif inp[0] == 'LastPage':
-            print('gui LastPage')
         elif inp[0] == 'move':
             self.render_step(inp[1], player)
         elif inp[0] == 'SwitchPlayer':
@@ -228,24 +221,21 @@ class GUI:
         """
         if messages:
             self.messages = messages
-        pygame.draw.rect(self.screen, self._background_color, (700, 30, 150, 20))
+        pygame.draw.rect(self.screen, self._background_color, (700, 80, 150, 20))
         self._draw_round(False)
-        self._draw_text(self.messages, (745, 40), text_height=30)
+        self._draw_text(self.messages, (745, 90), text_height=self.TestSize)
         self._draw_score()
 
     def _draw_score(self, update=True):
         score = 'Score: ' + str(self.score[0]) + ' : ' + str(self.score[1])
-        self._draw_text(score, (940, 40),
-                        backgroud_color=self._background_color, text_height=30)
+        self._draw_text(score, (940, 90),
+                        backgroud_color=self._background_color, text_height=self.TestSize)
         if update:
             pygame.display.update()
 
     def _draw_round(self, update=True):
-
-        self._draw_text('History', (745, 155),backgroud_color=self._background_color, text_height=30)
-
-        self._draw_text('Round: ' + str(self.round_counter), (950, 155),backgroud_color=self._background_color, text_height=30)
-
+        self._draw_text('Round: ' + str(self.round_counter), (950, 205),
+                        backgroud_color=self._background_color, text_height=self.TestSize)
         if update:
             pygame.display.update()
 
@@ -295,7 +285,7 @@ class GUI:
             pygame.draw.line(self.screen, c, start_p2, end_p2)
 
     def _clean_ban(self):
-        print("_clean_ban")
+        #print("_clean_ban")
         self._draw_static()
         for chess in self.all_chess_list.sprites():
             if chess.player == 1:
@@ -308,34 +298,13 @@ class GUI:
 
 
     def _draw_ban(self,loc):
-        print("_draw_ban")
-
+        #print("_draw_ban")
         ban_image = pygame.image.load("ban.png")
         ban_image = pygame.transform.scale(ban_image, (50, 50))
         ban_image.convert()
         x, y = loc
         pos = int(self.UnitSize * 0.9 + x * self.UnitSize), int(self.UnitSize * 0.9 + (self.BoardSize - y - 1) * self.UnitSize)
-#        if player == 1:
-#        ban = Ban("ban.png", pos)
-#        self.all_ban_list.add(ban)
-#        print("all_ban_list ",self.all_ban_list)
-#        for ban in self.all_ban_list:
-        print("pos",pos)
         self.screen.blit(ban_image,pos)
-
-        pygame.display.update()
-
-    def _show_endmsg(self,winner):
-        print("_show_endmsg")
-        p1_image = pygame.image.load("p1.png")
-        p2_image = pygame.image.load("p2.png")
-        tie_image = pygame.image.load("tie.png")
-        if winner == 1:
-            self.screen.blit(p1_image,(40, 280))
-        elif winner == 2:
-            self.screen.blit(p2_image,(40, 280))
-        else:
-            self.screen.blit(tie_image,(40, 280))
         pygame.display.update()
 
     def _draw_static(self):
@@ -343,35 +312,20 @@ class GUI:
         Draw static elements that will not change in a round.
         """
         self.screen.fill(self._background_color)
-
-
         # load background picture
         background_image = pygame.image.load("bg.png")
-        panel_image1 = pygame.image.load("panel1.png")
-        panel_image2 = pygame.image.load("panel2.png")
-
-
+        panel_image = pygame.image.load("panel.png")
 
         # scale up the size of background picture
         background_image = pygame.transform.scale(background_image, (680, 680))
-        panel_image1 = pygame.transform.scale(panel_image1, (300, 60))
-        panel_image2 = pygame.transform.scale(panel_image2, (290, 360))
+        panel_image = pygame.transform.scale(panel_image, (300, 520))
 
         background_image.convert()
-        panel_image1.convert()
-        panel_image2.convert()
+        panel_image.convert()
 
         # the first para is the picture item , the second one is the position in the flame
         self.screen.blit(background_image, (0, 0))
-        self.screen.blit(panel_image1, (705, 50))
-        self.screen.blit(panel_image2, (705, 190))
-
-
-        self._draw_text("Player1", (770, 65), text_height=25,font_color=(255,255,255))
-        self._draw_text("Player2", (925, 65),text_height=25,font_color=(255,255,255))
-
-        # self._draw_text("Human(black)", (755, 100), text_height=20)
-        # self._draw_text("AlphaZero(white)", (925, 100),text_height=20)
+        self.screen.blit(panel_image, (700, 100))
 
         # draw board
         board_lenth = self.UnitSize * self.BoardSize
@@ -387,23 +341,6 @@ class GUI:
             # coordinate values
             self._draw_text(self.BoardSize - i - 1, (self.UnitSize / 2, start + self.UnitSize), text_height=self.TestSize)  # 竖的
             self._draw_text(i, (start + self.UnitSize, self.UnitSize / 2), text_height=self.TestSize)  # 横的
-
-        # draw History
-        # self._draw_text('History', (745, 155),backgroud_color=self._background_color, text_height=30)
-
-        self._draw_text('NO.', (730, 215),backgroud_color=(255,255,255), text_height=30)
-        self._draw_text('Winner', (820, 215),backgroud_color=(255,255,255), text_height=30)
-        self._draw_text('Time', (930, 215),backgroud_color=(255,255,255), text_height=30)
-
-        pygame.draw.line(self.screen, self._button_color, (705, 170), (995, 170),1)
-        pygame.draw.line(self.screen, self._button_color, (705, 230), (995, 230),1)
-
-        for i in range(0, 8, 1):
-            #self._draw_text(str(i), (730, 265+i*40),backgroud_color=(255,255,255), text_height=30)
-            #self._draw_text('computer', (820, 265+i*40),backgroud_color=(255,255,255), text_height=30)
-            #self._draw_text('12:87:23', (930, 265+i*40),backgroud_color=(255,255,255), text_height=30)
-            pygame.draw.line(self.screen, self._button_color, (705, 270+(i%8)*40), (995, 270+(i%8)*40),1)
-            #pygame.draw.line(UI.screen, UI._button_color, (705, 320+(i%8)*40), (995, 320+(i%8)*40),1)
 
         # draw buttons
         for name in self.areas.keys():
@@ -435,16 +372,16 @@ class GUI:
     def _draw_button(self, name, high_light=0, update=False):
         rec = self.areas[name]
         if not high_light:
-            color = self._button_color
+            color = (240, 150 , 30)
         elif high_light == 1:
-            color = self._button_color
+            color = (255, 164 , 45)
         elif high_light == 2:
-            color = self._button_color
+            color = (255, 164 , 45)
         else:
             raise ValueError('high_light value error')
         pygame.draw.rect(self.screen, color, rec)
         pygame.draw.rect(self.screen, (0, 0, 0), rec, 1)
-        self._draw_text(name, rec.center, text_height=self.TestSize)
+        self._draw_text(name, rec.center, text_height=self.TestSize*0.7)
         if update:
             pygame.display.update()
 
@@ -465,12 +402,8 @@ if __name__ == '__main__':
     player = 1
     i = 1
     while True:
-        """if i == 1:
-            UI.show_messages('first player\'s turn')
-        else:
-            UI.show_messages('second player\'s turn')"""
         inp = UI.get_input()
-        #print("get_input()",inp)
+        print(inp)
         UI.deal_with_input(inp, i)
         if inp[0] == 'move':
             i %= 2

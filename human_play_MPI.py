@@ -19,8 +19,7 @@ and also each rank can load the same model and vote the next move,
 besides the upper benifit ,it can also improve the strength and save the playout time by parallel.
 some other parallel ways can find in《Parallel Monte-Carlo Tree Search》.
 '''
-import pygame
-from pygame.locals import *
+
 from game_board import Board
 from mcts_pure import MCTSPlayer as MCTS_Pure
 from mcts_alphaZero import MCTSPlayer
@@ -28,20 +27,11 @@ from policy_value_net_tensorlayer import PolicyValueNet
 from mpi4py import MPI
 from collections import Counter
 from GUI_v1_4 import GUI
-import tensorflow as tf
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-import time
 import os
 import traceback
 
 # how  to run :
 # mpiexec -np 2 python -u human_play_mpi.py
-
-#win-loss record
-win_loss_list=[]
-show_start = 0
-
-#is do move or not
 
 #　MPI setting
 comm = MPI.COMM_WORLD
@@ -81,8 +71,6 @@ class Human(object):
     def __str__(self):
         return "Human {}".format(self.player)
 
-
-
 def graphic(board, player1=1, player2=2):
     '''
     Draw the board and show game info
@@ -92,7 +80,7 @@ def graphic(board, player1=1, player2=2):
 
     print("Player", player1, "with X".rjust(3))
     print("Player", player2, "with O".rjust(3))
-    print("board.states",board.states)
+    print(board.states)
     print()
     print(' ' * 2, end='')
     # rjust()
@@ -161,7 +149,7 @@ def start_play(start_player=0, is_shown=1):
 
         if rank == 0:
             # print move index
-			# print(board.move_to_location(bcast_move))
+            print(board.move_to_location(bcast_move))
             if is_shown:
                 graphic(board=board)
 
@@ -180,7 +168,7 @@ def start_play(start_player=0, is_shown=1):
 
         if rank == 0:
             # gather ecah rank's move and get the most selected one
-			# print('list is', gather_move_list)
+            print('list is', gather_move_list)
             bcast_move = Counter(gather_move_list).most_common()[0][0]
 
         # bcast the move to other ranks
@@ -192,7 +180,7 @@ def start_play(start_player=0, is_shown=1):
         # print('rank:', rank, board.availables)
 
         if rank == 0:
-		# print(board.move_to_location(bcast_move))
+            print(board.move_to_location(bcast_move))
             if is_shown:
                 graphic(board=board)
         end, winner = board.game_end()
@@ -219,7 +207,7 @@ def start_play(start_player=0, is_shown=1):
         # print('rank:', rank, board.availables)
 
         if rank == 0:
-		#print(board.move_to_location(bcast_move))
+            print(board.move_to_location(bcast_move))
             if is_shown:
                 graphic(board=board)
         end, winner = board.game_end()
@@ -330,16 +318,8 @@ def forbidden(h, w, player=1):
     return 0
 
 def start_play_with_UI(start_player=0):
-
-
-
     # run a gomoku game with AI in GUI
-
-    global show_start #using glbal var
-    global win_loss_list
     bcast_move = -1
-    tStart = time.time()#計時開始
-    print("tStart",tStart)
 
     # init game and player
     board.init_board()
