@@ -139,7 +139,7 @@ def start_play(start_player=0, is_shown=1):
     if start_player == 0:
         # human first to play
         if rank == 0:
-            bcast_move,move_probs = player1.get_action(board=board,is_selfplay=False,print_probs_value=False)
+            bcast_move,move_probs,visits = player1.get_action(board=board,is_selfplay=False,print_probs_value=False)
         # bcast the move to other ranks
         bcast_move = comm.bcast(bcast_move, root=0)
         # print('!'*10,rank,bcast_move)
@@ -160,9 +160,9 @@ def start_play(start_player=0, is_shown=1):
         # AI's turn
         if rank == 0:
             # print prior probabilities
-            gather_move, move_probs = player2.get_action(board=board,is_selfplay=False,print_probs_value=True)
+            gather_move, move_probs, visits = player2.get_action(board=board,is_selfplay=False,print_probs_value=True)
         else:
-            gather_move, move_probs = player2.get_action(board=board, is_selfplay=False, print_probs_value=False)
+            gather_move, move_probs, visits = player2.get_action(board=board, is_selfplay=False, print_probs_value=False)
 
         gather_move_list = comm.gather(gather_move, root=0)
 
@@ -196,7 +196,7 @@ def start_play(start_player=0, is_shown=1):
 
         # human's turn
         if rank == 0:
-            bcast_move, move_probs = player1.get_action(board=board)
+            bcast_move, move_probs, visits = player1.get_action(board=board)
 
         # bcast the move to other ranks
         bcast_move = comm.bcast(bcast_move, root=0)
@@ -332,9 +332,10 @@ def start_play_with_UI(start_player=0):
         SP = start_player
         UI = GUI(board.width)
 
-    gather_move_list,tlist,same_p_move = [],[],[]
+    gather_move_list,visits_list=[],[]
+    tlist,tlist2=[],[]
+    same_f_move = []
     ban,count = -1,0
-    again = False
     ins = ''
 
     while True:
@@ -363,64 +364,64 @@ def start_play_with_UI(start_player=0):
                 # reset the search tree
                 player2.reset_player()
                 while True:
-                    again = False
                     #print(os.getpid(),"rank:",rank,", 1:",board.move_to_location(bcast_move), bcast_move, type(bcast_move))
                     if rank == 0:
                         # print prior probabilities
-                        gather_move, move_probs = player2.get_action(board=board, is_selfplay=False, print_probs_value=True, same_p_move=same_p_move)
+                        gather_move, move_probs, visits = player2.get_action(board=board, is_selfplay=False, print_probs_value=True)
                     else:
-                        gather_move, move_probs = player2.get_action(board=board, is_selfplay=False, print_probs_value=False, same_p_move=same_p_move)
+                        gather_move, move_probs, visits = player2.get_action(board=board, is_selfplay=False, print_probs_value=False)
                     
                     #print(os.getpid(),"rank: {0}, bef tlist:{1}, gather_move:{2}".format(rank,tlist,gather_move))
                     tlist = comm.gather(gather_move, root=0)
+                    tlist2 = comm.gather(visits, root=0)
                     #print(os.getpid(),"rank: {0}, aft tlist:{1}, gather_move:{2}".format(rank,tlist,gather_move))
         
                     if rank == 0:
                         for i in tlist:
                             gather_move_list.append(i)
+                        for i in tlist2:
+                            visits_list.append(i)
                         print('rank: 0, gather_move_list:',gather_move_list)
+                        print('rank: 0, visits_list:',visits_list)
                         c = Counter(gather_move_list).most_common()
-                        print('rank: 0, c:', c)
                         if len(c)>1 and c[0][1]==c[1][1]:
-                            again = True
-                            same_p_move = [j[0] for j in c if j[1]==c[0][1]]
-                            same_p_move.insert(0,c[0][1])  #0: visits, else: moves with the visits
-                            print('rank: 0, same_p_move:', same_p_move)
-                        bcast_move = c[0][0]
+                            same_f_move = [j[0] for j in c if j[1]==c[0][1]]
+                            max_v_list=[0]*len(same_f_move)
+                            for i in range(len(gather_move_list)):
+                                for j in range(len(same_f_move)):
+                                    if gather_move_list[i]==same_f_move[j] and max_v_list[j]<visits_list[i]:
+                                        max_v_list[j] = visits_list[i]
+                            bcast_move = same_f_move[max_v_list.index(max(max_v_list))]
+                        else:
+                            bcast_move = c[0][0]
                         print('rank: 0, bcast_move:',bcast_move)
                         gather_move_list.clear()
+                        visits_list.clear()
                         tlist.clear()
+                        tlist2.clear()
                         if current_player_num == SP:
                             x, y = board.move_to_location(bcast_move)
                             ban = forbidden(x, y)
                     
                     if rank==0:
                         if comm.Get_size()>1:
-                            #print('rank:{}, bef send ban:{}'.format(rank, ban))
+                            print('rank:{}, bef send ban:{}'.format(rank, ban))
                             for i in range(1,comm.Get_size()):
                                 comm.send(ban,dest=i)
-                            #print('rank:{}, aft send ban:{}'.format(rank, ban))
+                            print('rank:{}, aft send ban:{}'.format(rank, ban))
                             #print('rank:{}, bef send bcast_move:{}'.format(rank, bcast_move))
                             for i in range(1,comm.Get_size()):
                                 comm.send(bcast_move,dest=i)
                             #print('rank:{}, aft send bcast_move:{}'.format(rank, bcast_move))
-                            print('rank:{}, bef send again:{}'.format(rank, again))
-                            for i in range(1,comm.Get_size()):
-                                comm.send(again,dest=i)
-                            print('rank:{}, aft send again:{}'.format(rank, again))
                     else:
-                        #print('rank:{}, bef recv ban:{}'.format(rank, ban))
+                        print('rank:{}, bef recv ban:{}'.format(rank, ban))
                         ban = comm.recv(source=0)
-                        #print('rank:{}, aft recv ban:{}'.format(rank, ban))
+                        print('rank:{}, aft recv ban:{}'.format(rank, ban))
                         #print('rank:{}, bef recv bcast_move:{}'.format(rank, bcast_move))
                         bcast_move = comm.recv(source=0)
                         #print('rank:{}, aft recv bcast_move:{}'.format(rank, bcast_move))
-                        #print('rank:{}, bef recv bcast_move:{}'.format(rank, bcast_move))
-                        again = comm.recv(source=0)
-                        #print('rank:{}, aft recv bcast_move:{}'.format(rank, bcast_move)) 
                     
-                    if (ban == 0 or ban == 2) and again==False:
-                        same_p_move.clear()
+                    if ban == 0 or ban == 2:
                         break
                     elif ban == 1 or ban == 3 or ban == 4:
                         board.availables.remove(bcast_move)

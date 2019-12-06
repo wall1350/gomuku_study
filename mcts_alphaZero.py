@@ -261,23 +261,15 @@ class MCTS(object):
                 #print('move in tree...',action)
                 state.do_move(action)
 
-    def get_move_visits(self, state, same_p_move=[]):
+    def get_move_visits(self, state):
         '''
         Run all playouts sequentially and return the available actions and
         their corresponding visiting times.
         state: the current game state
         '''
-        bk = False
         for n in range(self._n_playout):
             state_copy = copy.deepcopy(state)
             self._playout(state_copy)
-            if same_p_move!=[]:
-                for i in range(1,len(same_p_move)):
-                    if self._root._children[same_p_move[i]] != same_p_move[0]:
-                        bk = True
-                        break
-                if bk:
-                    break
 
         # calc the visit counts at the root node
         act_visits = [(act, node._n_visits)
@@ -340,7 +332,7 @@ class MCTSPlayer(object):
         '''
         self.mcts.update_with_move(-1)
 
-    def get_action(self,board,is_selfplay,print_probs_value,same_p_move=[]):
+    def get_action(self,board,is_selfplay,print_probs_value):
         '''
         get an action by mcts
         do not discard all the tree and retain the useful part
@@ -350,7 +342,7 @@ class MCTSPlayer(object):
         move_probs = np.zeros(board.width * board.height)
         if len(sensible_moves) > 0:
             if is_selfplay:
-                acts, visits = self.mcts.get_move_visits(board,same_p_move)
+                acts, visits = self.mcts.get_move_visits(board)
                 if board.width * board.height - len(board.availables) <= self.first_n_moves:
                     # For the first n moves of each game, the temperature is set to τ = 1
                     temp = 1
@@ -367,7 +359,7 @@ class MCTSPlayer(object):
             else:
                 self.mcts.update_with_move(board.last_move)
                 # update the tree with opponent's move and then do mcts from the new node
-                acts, visits = self.mcts.get_move_visits(board,same_p_move)
+                acts, visits = self.mcts.get_move_visits(board)
 
                 temp = 1e-3
                 # always choose the most visited move
@@ -383,6 +375,8 @@ class MCTSPlayer(object):
 
                 self.mcts.update_with_move(move)
                 # update the tree with self move
+            
+            v = visits[acts.index(move)]
 
             p = softmax(1.0 / 1.0 * np.log(np.array(visits) + 1e-10))
             move_probs[list(acts)] = p
@@ -398,7 +392,7 @@ class MCTSPlayer(object):
                     for x in p:
                         print("{0:6}".format(x), end='')
                     print('\r')"""
-            return move,move_probs
+            return move,move_probs,v
 
         else:
             print("WARNING: the board is full")
