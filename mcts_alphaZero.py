@@ -8,6 +8,7 @@ Created on Fri Dec  7 22:05:17 2018
 
 import numpy as np
 import copy
+import time
 from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
@@ -36,7 +37,6 @@ class TreeNode(object):
         self.W = 0
         self.v = 0
         self._P = prior_p # its the prior probability that action's taken to get this node
-        self.lock = False
 
     def expand(self, action_priors,add_noise):
         '''
@@ -73,8 +73,6 @@ class TreeNode(object):
         Select action among children that gives maximum action value Q plus bonus u(P).
         Return: A tuple of (action, next_node)
         '''
-        if self.lock == True:
-            return
         action, node = max(self._children.items(),
                    key=lambda act_node: act_node[1].get_value(c_puct))
         """for i in self._children.keys():
@@ -177,8 +175,20 @@ class MCTS(object):
         self._n_playout = n_playout # times of tree search
         self._is_selfplay = is_selfplay
         
-        self.lock = False
+        self.__lock = 0
+
         self.virtual_loss = 1
+        self.undone_proc = comm.Get_size() # ==0, sync return
+        if rank==0:
+            fp = open("sync_tree.txt", "w")
+            fp.write('{}\n'.format(comm.Get_size()))
+            fp.close()
+            fp = open("pv.txt", "w")
+            fp.close()
+            fp = open("pv_fn.txt", "w")
+            fp.close()
+            fp = open("waiting_q.txt", "w")
+            fp.close()
 
     def _playout(self, state):
         '''
@@ -189,6 +199,7 @@ class MCTS(object):
         node = self._root
         # print('============node visits:',node._n_visits)
         # deep = 0
+        #print('rank:{}, bef while 1'.format(rank))
         while(1):
             if node.is_leaf():
                 break
@@ -198,23 +209,99 @@ class MCTS(object):
             state.do_move(action)
             # deep+=1
         # print('-------------deep is :',deep)
-
+        #print('rank:{}, aft while 1'.format(rank))
+        #print('rank:{}, bef while 2'.format(rank))
         while(1):
             # Evaluate the leaf using a network which outputs a list of
             # (action, probability) tuples p and also a score v in [-1, 1]
             # for the current player.
             action_probs, leaf_value = self._policy_value_fn(state,self._action_fc,self._evaluation_fc)
+            print('rank:{}, aft pv_fn'.format(rank))
             # Check for end of game.
             end, winner = state.game_end()
-            is_async = False
             update_u = False
+            #print('rank:{}, end:{}'.format(rank,end))
             if not end:
                 # print('expand move:',state.width*state.height-len(state.availables),node._n_visits)
-                if self.lock == False:
-                    self.lock = True
-                    self.lock = comm.bcast(self.lock, root=rank)
-                    is_async = True
+                #print('rank:{}, self.__lock:{}'.format(rank, self.__lock))
+                if self.__lock==0:
+                    # waiting_q for critical section
+                    while True:
+                        rewrite = 0
+                        try:
+                            #print('rank:{}, writing rank:{} !!!'.format(rank,rank))
+                            fp = open("waiting_q.txt", "a")
+                            fp.write('{}\n'.format(rank))
+                            fp.close()
+                        except:
+                            #print('rank:{}, writing rank:{} !!!'.format(rank,rank))
+                            #print('rank:{}, under reading'.format(rank))
+                            time.sleep(1)
+                            fp = open("waiting_q.txt", "a")
+                            fp.write('{}\n'.format(rank))
+                            fp.close()
+                        try:
+                            fp = open("waiting_q.txt", "r")
+                            f_rank = fp.readline().replace('\n','')
+                            #print('rank:{}, reading t_rank:{}!!!'.format(rank,f_rank))
+                            if f_rank=='':
+                                #print('rank:{}, type(f_rank): empty'.format(rank))
+                                rewrite = 1
+                            elif f_rank.isdigit():
+                                #print('rank:{}, type(f_rank): int'.format(rank))
+                                t_rank = int(f_rank)
+                            else:
+                                print('!!!!! rank:{}, type(f_rank):{}, f_rank:{}!!!!!'.format(rank,type(f_rank),f_rank))
+                            fp.close()
+                        except:
+                            time.sleep(1)
+                            #print('rank:{}, under writing'.format(rank))
+                            fp = open("waiting_q.txt", "r")
+                            f_rank = fp.readline().replace('\n','')
+                            #print('rank:{}, reading t_rank:{}!!!'.format(rank,f_rank))
+                            if f_rank=='':
+                                #print('rank:{}, type(f_rank): empty'.format(rank))
+                                rewrite = 1
+                            elif f_rank.isdigit():
+                                #print('rank:{}, type(f_rank): int'.format(rank))
+                                t_rank = int(f_rank)
+                            else:
+                                print('!!!!! rank:{}, type(f_rank):{}, f_rank:{}!!!!!'.format(rank,type(f_rank),f_rank))
+                            fp.close()
+                        if rewrite == 0:
+                            break
+
+                    if rank==t_rank:
+                        self.__lock = 1
+                        if comm.Get_size()>1:
+                            for i in range(0,t_rank):
+                                #print('rank:{} is now send ins: model1'.format(rank))
+                                comm.send('model1',dest=i)
+                            for i in range(t_rank+1,comm.Get_size()):
+                                #print('rank:{} is now send ins: model1'.format(rank))
+                                comm.send('model1',dest=i)
+                            for i in range(0,t_rank):
+                                #print('rank:{} is now send lock'.format(rank))
+                                comm.send(self.__lock,dest=i)
+                            for i in range(t_rank+1,comm.Get_size()):
+                                #print('rank:{} is now send lock'.format(rank))
+                                comm.send(self.__lock,dest=i)
+                    else:
+                        while True:
+                            print('rank:{} in model1 is now recv ins'.format(rank))
+                            ins = comm.recv(source=t_rank)
+                            print("rank:{} in model1 aft recv ins:{}".format(rank, ins))
+                            if ins=='model1':
+                                #print('rank:{} is now recv lock'.format(rank))
+                                self.__lock = comm.recv(source=t_rank)
+                                #print("rank:{} aft recv lock:{}".format(rank, self.__lock))
+                                break
+                            else:
+                                print('rank:{} recv wrong'.format(rank))
+
+                #print('rank:{}, bef expand'.format(rank))
                 node.expand(action_probs,add_noise=self._is_selfplay)
+                #print('rank:{}, aft expand'.format(rank))
             else:
                 # for end state，return the "true" leaf_value
                 # print('end!!!',node._n_visits)
@@ -225,7 +312,7 @@ class MCTS(object):
                         1.0 if winner == state.get_current_player() else -1.0
                     )
                     temp_node = node
-                    #print("enter while 2-1")
+                    #print("rank:{}, enter while 2-1".format(rank))
                     while temp_node!=None:
                         n = {}
                         if temp_node._parent:
@@ -238,7 +325,7 @@ class MCTS(object):
                         else:
                             break
                         n = None
-                    #print("exit while 2-1")
+                    #print("rank:{}, exit while 2-1".format(rank))
                     update_u = True
                     
             # Update value and visit count of nodes in this traversal.
@@ -247,19 +334,51 @@ class MCTS(object):
             node._n_visits -= self.virtual_loss
             node.W += self.virtual_loss
             
-            if self.lock and is_async:
-                self.lock = False
-                self.lock = comm.bcast(self.lock, root=rank)
+            if self.__lock==1: #sync
+                if rank == t_rank:
+                    print('rank:{}, file clear!!!'.format(rank))
+                    self.__lock = 0
+                    fp = open("waiting_q.txt", "w")
+                    fp.close()
+                if comm.Get_size()>1:
+                    if rank==t_rank:
+                        for i in range(0,t_rank):
+                            #print('rank:{} is now send ins: model2'.format(rank))
+                            comm.send('model2',dest=i)
+                        for i in range(t_rank+1,comm.Get_size()):
+                            #print('rank:{} is now send ins: model2'.format(rank))
+                            comm.send('model2',dest=i)
+                        for i in range(0,t_rank):
+                            #print('rank:{} is now send lock'.format(rank))
+                            comm.send(self.__lock,dest=i)
+                        for i in range(t_rank+1,comm.Get_size()):
+                            #print('rank:{} is now send lock'.format(rank))
+                            comm.send(self.__lock,dest=i)
+                    else:
+                        while True:
+                            print('rank:{} in model2 is now recv ins'.format(rank))
+                            ins = comm.recv(source=t_rank)
+                            print("rank:{} in model2 aft recv ins:{}".format(rank, ins))
+                            if ins=='model2':
+                                #print('rank:{} is now recv lock'.format(rank))
+                                self.__lock = comm.recv(source=t_rank)
+                                #print("rank:{} aft recv lock:{}".format(rank, self.__lock))
+                                break
+                            else:
+                                print('rank:{} recv wrong'.format(rank))
 
-            if self.lock == False: #sync lock
+            if self.__lock == 0: #sync lock
                 break
-            while self.lock:  #sync lock
+            #print('rank:{}, bef while 2-2'.format(rank))
+            while self.__lock==1:  #sync lock
                 if node.is_leaf():
                     break
                 # Greedily select next move.
                 action, node = node.select(self._c_puct, self.virtual_loss)
                 #print('move in tree...',action)
                 state.do_move(action)
+            #print('rank:{}, aft while 2-2'.format(rank))
+        #print('rank:{}, aft while 2'.format(rank))
 
     def get_move_visits(self, state):
         '''
@@ -267,7 +386,63 @@ class MCTS(object):
         their corresponding visiting times.
         state: the current game state
         '''
+        """for n in range(self._n_playout):
+            state_copy = copy.deepcopy(state)
+            self._playout(state_copy)"""
+
+        self.undone_proc = comm.Get_size()
+        if rank==0:
+            try:
+                fp = open("sync_tree.txt", "w")
+                fp.write('{}\n'.format(self.undone_proc))
+                fp.close()
+            except:
+                print('rank:{}, under reading'.format(rank))
+                time.sleep(1)
+                fp = open("sync_tree.txt", "w")
+                fp.write('{}\n'.format(self.undone_proc))
+                fp.close()
+
         for n in range(self._n_playout):
+            state_copy = copy.deepcopy(state)
+            self._playout(state_copy)
+
+        try:
+            fp = open("sync_tree.txt", "r")
+            self.undone_proc = int(fp.readline().replace('\n',''))
+            fp.close()
+        except:
+            print('rank:{}, under writing'.format(rank))
+            time.sleep(1)
+            fp = open("sync_tree.txt", "r")
+            self.undone_proc = int(fp.readline().replace('\n',''))
+            fp.close()
+        try:
+            fp = open("sync_tree.txt", "w")
+            fp.write('{}\n'.format(self.undone_proc-1))
+            fp.close()
+        except:
+            print('rank:{}, under reading'.format(rank))
+            time.sleep(1)
+            fp = open("sync_tree.txt", "w")
+            fp.write('{}\n'.format(self.undone_proc-1))
+            fp.close()
+        self.undone_proc-=1
+
+        while True:
+            print('======= rank:{} still waiting ======='.format(rank))
+            try:
+                fp = open("sync_tree.txt", "r")
+                self.undone_proc = int(fp.readline().replace('\n',''))
+                fp.close()
+            except:
+                print('rank:{}, under writing'.format(rank))
+                time.sleep(1)
+                fp = open("sync_tree.txt", "r")
+                self.undone_proc = int(fp.readline().replace('\n',''))
+                fp.close()           
+            if self.undone_proc==0:
+                break 
             state_copy = copy.deepcopy(state)
             self._playout(state_copy)
 
@@ -337,6 +512,7 @@ class MCTSPlayer(object):
         get an action by mcts
         do not discard all the tree and retain the useful part
         '''
+        print('fc: get_action')
         sensible_moves = board.availables
         # the pi vector returned by MCTS as in the alphaGo Zero paper
         move_probs = np.zeros(board.width * board.height)

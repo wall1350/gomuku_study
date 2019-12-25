@@ -1,14 +1,7 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Dec  8 13:02:14 2018
-
-@author: initial-h
-"""
-
 import tensorflow as tf
 import tensorlayer as tl
 from tensorlayer.layers import *
-import os
+import os, time
 import numpy as np
 from mpi4py import MPI
 
@@ -27,11 +20,16 @@ class PolicyValueNet():
             # use GPU or not ,if there are a few GPUs,it's better to assign GPU ID
             os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
             os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+        elif cuda == True:
+            # use GPU or not ,if there are a few GPUs,it's better to assign GPU ID
+            os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+            os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
         self.board_width = board_width
         self.board_height = board_height
         
-        self.lock = False
+        self.__lock = 0
+        self.__lock2 = 0
 
         # Make a session
         self.session = tf.InteractiveSession()
@@ -179,19 +177,135 @@ class PolicyValueNet():
         # evaluation, (di(p), v) = fθ(di(sL)),
         # where di is a dihedral reflection or rotation
         # selected uniformly at random from i in [1..8]
-        #print("fc: policy_value_fn_random")
+        print("rank:{}, fc: policy_value_fn_random".format(rank))
         legal_positions = board.availables
-        
+        t_rank = -1 # process in critical section
+
+        print('rank:{}, bef fn while'.format(rank))
         while 1:
-            if self.lock==False:
-                self.lock = True
-                self.lock = comm.bcast(self.lock, root=rank)
+            if self.__lock==0:
+                while True:
+                    rewrite = 0
+                    try:
+                        #print('rank:{}, writing rank:{} !!!'.format(rank,rank))
+                        fp = open("pv_fn.txt", "a")
+                        fp.write('{}\n'.format(rank))
+                        fp.close()
+                    except:
+                        #print('rank:{}, under reading'.format(rank))
+                        #print('rank:{}, writing rank:{} !!!'.format(rank,rank))
+                        time.sleep(1)
+                        fp = open("pv_fn.txt", "a")
+                        fp.write('{}\n'.format(rank))
+                        fp.close()
+                    try:
+                        fp = open("pv_fn.txt", "r")
+                        f_rank = fp.readline().replace('\n','')
+                        #print('rank:{}, reading f_rank:{}!!!'.format(rank,f_rank))
+                        if f_rank=='':
+                            #print('rank:{}, type(f_rank): empty'.format(rank))
+                            rewrite = 1
+                        elif f_rank.isdigit():
+                            #print('rank:{}, type(f_rank): int'.format(rank))
+                            t_rank = int(f_rank)
+                        else:
+                            print('!!!!! rank:{}, type(f_rank):{}, f_rank:{}!!!!!'.format(rank,type(f_rank),f_rank))
+                        fp.close()
+                    except:
+                        time.sleep(1)
+                        #print('rank:{}, under writing'.format(rank))
+                        fp = open("pv_fn.txt", "r")
+                        f_rank = fp.readline().replace('\n','')
+                        #print('rank:{}, reading f_rank:{}!!!'.format(rank,f_rank))
+                        if f_rank=='':
+                            #print('rank:{}, type(f_rank): empty'.format(rank))
+                            rewrite = 1
+                        elif f_rank.isdigit():
+                            #print('rank:{}, type(f_rank): int'.format(rank))
+                            t_rank = int(f_rank)
+                        else:
+                            print('!!!!! rank:{}, type(f_rank):{}, f_rank:{}!!!!!'.format(rank,type(f_rank),f_rank))
+                        fp.close()
+                    if rewrite == 0:
+                        break
+
+                if rank==t_rank:
+                    self.__lock = 1
+                    if comm.Get_size()>1:
+                        for i in range(0,t_rank):
+                            #print('rank:{} is now send ins: pv_fn1'.format(rank))
+                            comm.send('pv_fn1',dest=i)
+                        for i in range(t_rank+1,comm.Get_size()):
+                            #print('rank:{} is now send ins: pv_fn1'.format(rank))
+                            comm.send('pv_fn1',dest=i)
+                        for i in range(0,t_rank):
+                            #print('rank:{} is now send lock'.format(rank))
+                            comm.send(self.__lock,dest=i)
+                        for i in range(t_rank+1,comm.Get_size()):
+                            #print('rank:{} is now send lock'.format(rank))
+                            comm.send(self.__lock,dest=i)
+                else:
+                    while True:
+                        print('rank:{} in pv_fn1 is now recv ins'.format(rank))
+                        ins = comm.recv(source=t_rank)
+                        print("rank:{} in pv_fn1 aft recv ins:{}".format(rank, ins))
+                        if ins=='pv_fn1':
+                            #print('rank:{} is now recv lock'.format(rank))
+                            self.__lock = comm.recv(source=t_rank)
+                            #print("rank:{} aft recv lock:{}".format(rank, self.__lock))
+                            break
+                        else:
+                            print('rank:{} recv wrong'.format(rank))
+
+            if rank == t_rank:
                 current_state = np.ascontiguousarray(board.current_state().reshape(
                     -1, self.planes_num, self.board_width, self.board_height))
-                self.lock = False
-                self.lock = comm.bcast(self.lock, root=rank)
+
+            if self.__lock==1:
+                if rank == t_rank:
+                    try:
+                        print('rank:{}, file clear!!!'.format(rank))
+                        self.__lock = 0
+                        fp = open("pv_fn.txt", "w")
+                        fp.close()
+                    except:
+                        time.sleep(1)
+                        print('rank:{}, under reading'.format(rank))
+                        print('rank:{}, file clear!!!'.format(rank))
+                        self.__lock = 0
+                        fp = open("pv_fn.txt", "w")
+                        fp.close()
+                if comm.Get_size()>1:
+                    if rank==t_rank:
+                        for i in range(0,t_rank):
+                            #print('rank:{} is now send ins: pv_fn2'.format(rank))
+                            comm.send('pv_fn2',dest=i)
+                        for i in range(t_rank+1,comm.Get_size()):
+                            #print('rank:{} is now send ins: pv_fn2'.format(rank))
+                            comm.send('pv_fn2',dest=i)
+                        for i in range(0,t_rank):
+                            #print('rank:{} is now send lock'.format(rank))
+                            comm.send(self.__lock,dest=i)
+                        for i in range(t_rank+1,comm.Get_size()):
+                            #print('rank:{} is now send lock'.format(rank))
+                            comm.send(self.__lock,dest=i)
+                    else:
+                        while True:
+                            print('rank:{} in pv_fn2 is now recv ins'.format(rank))
+                            ins = comm.recv(source=t_rank)
+                            print("rank:{} in pv_fn2 aft recv ins:{}".format(rank, ins))
+                            if ins=='pv_fn2':
+                                #print('rank:{} is now recv lock'.format(rank))
+                                self.__lock = comm.recv(source=t_rank)
+                                #print("rank:{} aft recv lock:{}".format(rank, self.__lock))
+                                break
+                            else:
+                                print('rank:{} recv wrong'.format(rank))
+
+            if rank==t_rank:
                 break
-            
+
+        print('rank:{}, aft fn while'.format(rank))
 
         # print('current state shape',current_state.shape)
 
@@ -203,8 +317,131 @@ class PolicyValueNet():
             equi_state = np.array([np.fliplr(s) for s in equi_state])
         # print(equi_state.shape)
 
-        # put equi_state to network
-        act_probs, value = self.policy_value(np.array([equi_state]),actin_fc,evaluation_fc)
+        print('rank:{}, bef pv while'.format(rank))
+        while 1:
+            if self.__lock2==0:
+                while True:
+                    rewrite = 0
+                    try:
+                        #print('rank:{}, pv writing rank:{} !!!'.format(rank,rank))
+                        fp = open("pv.txt", "a")
+                        fp.write('{}\n'.format(rank))
+                        fp.close()
+                    except:
+                        #print('rank:{}, pv under reading'.format(rank))
+                        #print('rank:{}, pv writing rank:{} !!!'.format(rank,rank))
+                        time.sleep(1)
+                        fp = open("pv.txt", "a")
+                        fp.write('{}\n'.format(rank))
+                        fp.close()
+                    try:
+                        fp = open("pv.txt", "r")
+                        f_rank = fp.readline().replace('\n','')
+                        #print('rank:{}, pv reading f_rank:{}!!!'.format(rank,f_rank))
+                        if f_rank=='':
+                            #print('rank:{}, pv type(f_rank): empty'.format(rank))
+                            rewrite = 1
+                        elif f_rank.isdigit():
+                            #print('rank:{}, pv type(f_rank): int'.format(rank))
+                            t_rank = int(f_rank)
+                        else:
+                            print('!!!!! rank:{}, pv type(f_rank):{}, f_rank:{}!!!!!'.format(rank,type(f_rank),f_rank))
+                        fp.close()
+                    except:
+                        time.sleep(1)
+                        #print('rank:{}, pv under writing'.format(rank))
+                        fp = open("pv.txt", "r")
+                        f_rank = fp.readline().replace('\n','')
+                       # print('rank:{}, pv reading f_rank:{}!!!'.format(rank,f_rank))
+                        if f_rank=='':
+                            #print('rank:{}, pv type(f_rank): empty'.format(rank))
+                            rewrite = 1
+                        elif f_rank.isdigit():
+                            #print('rank:{}, pv type(f_rank): int'.format(rank))
+                            t_rank = int(f_rank)
+                        else:
+                            print('!!!!! rank:{}, pv type(f_rank):{}, f_rank:{}!!!!!'.format(rank,type(f_rank),f_rank))
+                        fp.close()
+                    if rewrite == 0:
+                        break
+
+                if rank==t_rank:
+                    self.__lock2 = 1
+                    if comm.Get_size()>1:
+                        for i in range(0,t_rank):
+                            #print('rank:{} is now send ins: pv1'.format(rank))
+                            comm.send('pv1',dest=i)
+                        for i in range(t_rank+1,comm.Get_size()):
+                            #print('rank:{} is now send ins: pv1'.format(rank))
+                            comm.send('pv1',dest=i)
+                        for i in range(0,t_rank):
+                            #print('rank:{} is now send lock'.format(rank))
+                            comm.send(self.__lock2,dest=i)
+                        for i in range(t_rank+1,comm.Get_size()):
+                            #print('rank:{} is now send lock'.format(rank))
+                            comm.send(self.__lock2,dest=i)
+                else:
+                    while True:
+                        print('rank:{} in pv1 is now recv ins'.format(rank))
+                        ins = comm.recv(source=t_rank)
+                        print("rank:{} in pv1 aft recv ins:{}".format(rank, ins))
+                        if ins=='pv1':
+                            #print('rank:{} is now recv lock'.format(rank))
+                            self.__lock2 = comm.recv(source=t_rank)
+                            #print("rank:{} aft recv lock:{}".format(rank, self.__lock2))
+                            break
+                        else:
+                            print('rank:{} recv wrong'.format(rank))
+
+            if rank == t_rank:
+                # put equi_state to network
+                act_probs, value = self.policy_value(np.array([equi_state]),actin_fc,evaluation_fc)
+
+            if self.__lock2==1:
+                if rank == t_rank:
+                    try:
+                        print('rank:{}, pv file clear!!!'.format(rank))
+                        self.__lock2 = 0
+                        fp = open("pv.txt", "w")
+                        fp.close()
+                    except:
+                        time.sleep(1)
+                        print('rank:{}, pv under reading'.format(rank))
+                        print('rank:{}, pv file clear!!!'.format(rank))
+                        self.__lock2 = 0
+                        fp = open("pv.txt", "w")
+                        fp.close()
+                if comm.Get_size()>1:
+                    if rank==t_rank:
+                        for i in range(0,t_rank):
+                            #print('rank:{} is now send ins: pv2'.format(rank))
+                            comm.send('pv2',dest=i)
+                        for i in range(t_rank+1,comm.Get_size()):
+                            #print('rank:{} is now send ins: pv2'.format(rank))
+                            comm.send('pv2',dest=i)
+                        for i in range(0,t_rank):
+                            #print('rank:{} is now send lock'.format(rank))
+                            comm.send(self.__lock2,dest=i)
+                        for i in range(t_rank+1,comm.Get_size()):
+                            #print('rank:{} is now send lock'.format(rank))
+                            comm.send(self.__lock2,dest=i)
+                    else:
+                        while True:
+                            print('rank:{} in pv2 is now recv ins'.format(rank))
+                            ins = comm.recv(source=t_rank)
+                            print("rank:{} in pv2 aft recv ins:{}".format(rank, ins))
+                            if ins=='pv2':
+                                #print('rank:{} is now recv lock'.format(rank))
+                                self.__lock2 = comm.recv(source=t_rank)
+                                #print("rank:{} aft recv lock:{}".format(rank, self.__lock2))
+                                break
+                            else:
+                                print('rank:{} recv wrong'.format(rank))
+
+            if rank==t_rank and self.__lock2==0:
+                break
+
+        print('rank:{}, aft pv while'.format(rank))
 
         # get dihedral reflection or rotation back
         equi_mcts_prob = np.flipud(act_probs[0].reshape(self.board_height, self.board_width))
@@ -214,6 +451,7 @@ class PolicyValueNet():
         act_probs = np.flipud(equi_mcts_prob).flatten()
 
         act_probs = zip(legal_positions, act_probs[legal_positions])
+        print('rank:{}, exit pv_fn'.format(rank))
         return act_probs, value
 
     def train_step(self, state_batch, mcts_probs, winner_batch, lr):

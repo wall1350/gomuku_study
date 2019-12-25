@@ -328,8 +328,8 @@ def start_play_with_UI(start_player=0):
     current_player_num = start_player
     restart = 0
     end = False
+    SP = start_player
     if rank == 0:
-        SP = start_player
         UI = GUI(board.width)
 
     gather_move_list,visits_list=[],[]
@@ -364,17 +364,18 @@ def start_play_with_UI(start_player=0):
                 # reset the search tree
                 player2.reset_player()
                 while True:
-                    #print(os.getpid(),"rank:",rank,", 1:",board.move_to_location(bcast_move), bcast_move, type(bcast_move))
+                    print("rank:",rank,", 1:",board.move_to_location(bcast_move), bcast_move, type(bcast_move))
                     if rank == 0:
                         # print prior probabilities
                         gather_move, move_probs, visits = player2.get_action(board=board, is_selfplay=False, print_probs_value=True)
                     else:
                         gather_move, move_probs, visits = player2.get_action(board=board, is_selfplay=False, print_probs_value=False)
                     
-                    #print(os.getpid(),"rank: {0}, bef tlist:{1}, gather_move:{2}".format(rank,tlist,gather_move))
+                    print("rank: {0}, 2: {1}, {2}, {3}".format(rank,board.move_to_location(bcast_move),bcast_move,type(bcast_move)))
+                    print(os.getpid(),"rank: {0}, bef tlist:{1}, gather_move:{2}".format(rank,tlist,gather_move))
                     tlist = comm.gather(gather_move, root=0)
                     tlist2 = comm.gather(visits, root=0)
-                    #print(os.getpid(),"rank: {0}, aft tlist:{1}, gather_move:{2}".format(rank,tlist,gather_move))
+                    print(os.getpid(),"rank: {0}, aft tlist:{1}, gather_move:{2}".format(rank,tlist,gather_move))
         
                     if rank == 0:
                         for i in tlist:
@@ -405,21 +406,32 @@ def start_play_with_UI(start_player=0):
                     
                     if rank==0:
                         if comm.Get_size()>1:
-                            print('rank:{}, bef send ban:{}'.format(rank, ban))
+                            for i in range(1,comm.Get_size()):
+                                print('rank 0 is now send ins: ban')
+                                comm.send('ban',dest=i)
+                            #print('rank:{}, bef send ban:{}'.format(rank, ban))
                             for i in range(1,comm.Get_size()):
                                 comm.send(ban,dest=i)
-                            print('rank:{}, aft send ban:{}'.format(rank, ban))
+                            #print('rank:{}, aft send ban:{}'.format(rank, ban))
                             #print('rank:{}, bef send bcast_move:{}'.format(rank, bcast_move))
                             for i in range(1,comm.Get_size()):
                                 comm.send(bcast_move,dest=i)
                             #print('rank:{}, aft send bcast_move:{}'.format(rank, bcast_move))
                     else:
-                        print('rank:{}, bef recv ban:{}'.format(rank, ban))
-                        ban = comm.recv(source=0)
-                        print('rank:{}, aft recv ban:{}'.format(rank, ban))
-                        #print('rank:{}, bef recv bcast_move:{}'.format(rank, bcast_move))
-                        bcast_move = comm.recv(source=0)
-                        #print('rank:{}, aft recv bcast_move:{}'.format(rank, bcast_move))
+                        while True:
+                            print('rank {} is now recv ins'.format(rank))
+                            ins = comm.recv(source=0)
+                            print("rank {} aft recv ins:{}".format(rank, ins))
+                            if ins=='ban':
+                                #print('rank:{}, bef recv ban:{}'.format(rank, ban))
+                                ban = comm.recv(source=0)
+                                #print('rank:{}, aft recv ban:{}'.format(rank, ban))
+                                #print('rank:{}, bef recv bcast_move:{}'.format(rank, bcast_move))
+                                bcast_move = comm.recv(source=0)
+                                #print('rank:{}, aft recv bcast_move:{}'.format(rank, bcast_move))
+                                break
+                            else:
+                                print('rank:{} recv wrong'.format(rank))
                     
                     if ban == 0 or ban == 2:
                         break
@@ -427,7 +439,6 @@ def start_play_with_UI(start_player=0):
                         board.availables.remove(bcast_move)
                         
                 board.availables = [i for i in availables]
-                #print(os.getpid(),"rank: {0}, 2: {1}, {2}, {3}".format(rank,board.move_to_location(bcast_move),bcast_move,type(bcast_move)))
                 print('***** rank:{}, end while *****'.format(rank))
             # human's turn
             else:
@@ -457,7 +468,7 @@ def start_play_with_UI(start_player=0):
                         restart = 'exit'
     
                     elif inp[0] == 'SwitchPlayer':
-                        #print('******* SwitchPlayer *******')
+                        print('******* SwitchPlayer *******')
                         SP = (SP + 1) % 2
                         UI.restart_game(False)
                         UI.reset_score()
@@ -468,7 +479,7 @@ def start_play_with_UI(start_player=0):
                         print('ignored inp:', inp)
                         continue
                         
-            #print('rank:{}, end:{}, restart:{}'.format(rank,end,restart))
+            print('rank:{}, end:{}, restart:{}'.format(rank,end,restart))
             if not end and not restart:
                 if rank == 0:
                     UI.render_step(bcast_move, board.current_player)
@@ -485,58 +496,64 @@ def start_play_with_UI(start_player=0):
                 if rank==0:
                     if comm.Get_size()>1:
                         for i in range(1,comm.Get_size()):
-                            #print('rank 0 is now send ins: move')
+                            print('rank 0 is now send ins: move')
                             comm.send('move',dest=i)
                         for i in range(1,comm.Get_size()):
-                            #print('rank 0 is now send board')
+                            print('rank 0 is now send board')
                             comm.send(board,dest=i)
-                        #print('rank 0  aft send')
                     #print('rank {}:, board='.format(rank),board.states.keys())
                 else:
-                    #print('rank {} is now recv ins'.format(rank))
-                    ins = comm.recv(source=0)
-                    #print("rank {} aft recv ins:{}".format(rank, ins))
-                    if ins=='move':
-                        #print('rank {} is now recv move'.format(rank))
-                        temp_board = comm.recv(source=0)
-                        #print("rank {} aft recv temp_board:{}".format(rank, temp_board))
-                        board.availables.clear()
-                        board.states.clear()
-                        board.states_sequence.clear()
-                        for i in temp_board.availables:
-                            board.availables.append(i)
-                        for i in temp_board.states.keys():
-                            board.states[i] = temp_board.states[i]
-                        for i in temp_board.states_sequence:
-                            board.states_sequence.append(i)
-                        board.last_move = temp_board.last_move
-                        board.current_player = temp_board.current_player
-                        bcast_move = board.last_move
-                        temp_board = None
-                        #print('rank {}:, board='.format(rank),board.states.keys())
-                    elif ins=='switch':
-                        #print('rank {} is now recv board'.format(rank))
-                        temp_board = comm.recv(source=0)
-                        #print("rank {} aft recv temp_board:{}".format(rank, temp_board))
-                        board.availables.clear()
-                        board.states.clear()
-                        board.states_sequence.clear()
-                        for i in temp_board.availables:
-                            board.availables.append(i)
-                        for i in temp_board.states.keys():
-                            board.states[i] = temp_board.states[i]
-                        for i in temp_board.states_sequence:
-                            board.states_sequence.append(i)
-                        board.last_move = temp_board.last_move
-                        board.current_player = temp_board.current_player
-                        bcast_move = board.last_move
-                        temp_board = None
-                        current_player_num = SP = comm.recv(source=0)
-                        player2.reset_player()
+                    while True:
+                        print('rank {} is now recv ins'.format(rank))
+                        ins = comm.recv(source=0)
+                        print("rank {} aft recv ins:{}".format(rank, ins))
+                        if ins=='move':
+                            #print('rank {} is now recv board'.format(rank))
+                            temp_board = comm.recv(source=0)
+                            #print("rank {} aft recv temp_board:{}".format(rank, temp_board))
+                            board.availables.clear()
+                            board.states.clear()
+                            board.states_sequence.clear()
+                            for i in temp_board.availables:
+                                board.availables.append(i)
+                            for i in temp_board.states.keys():
+                                board.states[i] = temp_board.states[i]
+                            for i in temp_board.states_sequence:
+                                board.states_sequence.append(i)
+                            board.last_move = temp_board.last_move
+                            board.current_player = temp_board.current_player
+                            bcast_move = board.last_move
+                            temp_board = None
+                            break
+                            #print('rank {}:, board='.format(rank),board.states.keys())
+                        elif ins=='switch':
+                            print('rank {} is now recv board'.format(rank))
+                            temp_board = comm.recv(source=0)
+                            print("rank {} aft recv temp_board:{}".format(rank, temp_board))
+                            board.availables.clear()
+                            board.states.clear()
+                            board.states_sequence.clear()
+                            for i in temp_board.availables:
+                                board.availables.append(i)
+                            for i in temp_board.states.keys():
+                                board.states[i] = temp_board.states[i]
+                            for i in temp_board.states_sequence:
+                                board.states_sequence.append(i)
+                            board.last_move = temp_board.last_move
+                            board.current_player = temp_board.current_player
+                            bcast_move = board.last_move
+                            temp_board = None
+                            print('rank {} is now recv SP: {}'.format(rank,SP))
+                            current_player_num = SP = comm.recv(source=0)
+                            print("rank {} aft recv SP: {}".format(rank,SP))
+                            player2.reset_player()
+                            break
+                        else:
+                            print('rank:{} recv wrong'.format(rank))
 
                 end, winner = board.game_end()
                 #print('rank:',rank,'end:', end)
-    
+        
                 # check if game end
                 if end:
                     if rank == 0:
@@ -572,9 +589,9 @@ def start_play_with_UI(start_player=0):
                                 comm.send(board,dest=i)
                             #print('rank 0 aft send board')
                             for i in range(1,comm.Get_size()):
-                                #print('rank 0 is now send SP')
+                                #print('rank 0 is now send SP:',SP)
                                 comm.send(SP,dest=i)
-                            #print('rank 0 aft send SP')
+                            #print('rank 0 aft send SP:',SP)
                     player2.reset_player()
                     restart = 0
                     end = False
