@@ -27,6 +27,8 @@ from policy_value_net_tensorlayer import PolicyValueNet
 from mpi4py import MPI
 from collections import Counter
 from GUI_v1_4 import GUI
+import os
+import traceback
 
 # how  to run :
 # mpiexec -np 2 python -u human_play_mpi.py
@@ -34,6 +36,7 @@ from GUI_v1_4 import GUI
 #　MPI setting
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
+
 
 # game setting
 n_in_row = 5
@@ -58,7 +61,7 @@ class Human(object):
             if isinstance(location, str):  # for python3
                 location = [int(n, 10) for n in location.split(",")]
             move = board.location_to_move(location)
-        except Exception as e:
+        except:
             move = -1
         if move == -1 or move not in board.availables:
             print("invalid move")
@@ -100,27 +103,25 @@ def graphic(board, player1=1, player2=2):
         # print('\r\n') # new line
         print('\r')
 
-
-board= Board(width=width,height=height,n_in_row=n_in_row)
-
 # init model here
 # if you want to load different models in each rank,
 # you can assign it here ,like
 # if rank == 0 : model_file = '...'
 # if rank == 1 : model_file = '...'
-
+board= Board(width=width,height=height,n_in_row=n_in_row)
 model_file='model_15_15_5/best_policy.model'
 best_policy = PolicyValueNet(board_width=width,board_height=height,block=19,init_model=model_file,cuda=True)
 alpha_zero_player = MCTSPlayer(policy_value_function=best_policy.policy_value_fn_random,
                          action_fc=best_policy.action_fc_test,
                          evaluation_fc=best_policy.evaluation_fc2_test,
                          c_puct=5,
-                         n_playout=1,
+                         n_playout=400,
                          is_selfplay=False)
 
 player1 = Human()
 player2 = alpha_zero_player
 # player2 = MCTS_Pure(5,200)
+
 
 def start_play(start_player=0, is_shown=1):
     # run a gomoku game with AI in terminal
@@ -138,7 +139,7 @@ def start_play(start_player=0, is_shown=1):
     if start_player == 0:
         # human first to play
         if rank == 0:
-            bcast_move,move_probs = player1.get_action(board=board,is_selfplay=False,print_probs_value=False)
+            bcast_move,move_probs,visits = player1.get_action(board=board,is_selfplay=False,print_probs_value=False)
         # bcast the move to other ranks
         bcast_move = comm.bcast(bcast_move, root=0)
         # print('!'*10,rank,bcast_move)
@@ -159,9 +160,9 @@ def start_play(start_player=0, is_shown=1):
         # AI's turn
         if rank == 0:
             # print prior probabilities
-            gather_move, move_probs = player2.get_action(board=board,is_selfplay=False,print_probs_value=True)
+            gather_move, move_probs, visits = player2.get_action(board=board,is_selfplay=False,print_probs_value=True)
         else:
-            gather_move, move_probs = player2.get_action(board=board, is_selfplay=False, print_probs_value=False)
+            gather_move, move_probs, visits = player2.get_action(board=board, is_selfplay=False, print_probs_value=False)
 
         gather_move_list = comm.gather(gather_move, root=0)
 
@@ -195,7 +196,7 @@ def start_play(start_player=0, is_shown=1):
 
         # human's turn
         if rank == 0:
-            bcast_move, move_probs = player1.get_action(board=board)
+            bcast_move, move_probs, visits = player1.get_action(board=board)
 
         # bcast the move to other ranks
         bcast_move = comm.bcast(bcast_move, root=0)
@@ -220,6 +221,102 @@ def start_play(start_player=0, is_shown=1):
                     print("Game end. Tie")
             break
 
+def forbidden(h, w, player=1):
+    height = board.height
+    width = board.width
+    states = board.states
+    n = board.n_in_row
+    restricted = [0,0] # 33, 44
+    buffer = ["33333333333" for j in range(4)] # 3: 棋盤外
+
+    for i in range(w - n, w + n + 1): #下至上
+        if i < 0 or i >= width:
+            continue
+        buffer[0] = buffer[0][:i-w+5] + str(states.get(i + h * width, 0)) + buffer[0][i-w+6:]
+        buffer[0] = buffer[0][:5] + str(player) + buffer[0][6:]
+
+    for i in range(h - n, h + n + 1): #左至右
+        if i < 0 or i >= height:
+            continue
+        buffer[1] = buffer[1][:i-h+5] + str(states.get(i * width + w, 0)) + buffer[1][i-h+6:]
+        buffer[1] = buffer[1][:5] + str(player) + buffer[1][6:]
+
+    i = h - n - 1
+    j = w + n + 1
+    for count in range(11): #左上至右下
+        i += 1
+        j -= 1
+        if i < 0 or i >= height or j < 0 or j >= width:
+            continue
+        buffer[2] = buffer[2][:count] + str(states.get(i * width + j, 0)) + buffer[2][count+1:]
+        buffer[2] = buffer[2][:5] + str(player) + buffer[2][6:]
+
+    i = h - n - 1
+    j = w - n - 1
+    for count in range(11): #左下至右上
+        i += 1
+        j += 1
+        if i < 0 or i >= height or j < 0 or j >= width:
+            continue
+        buffer[3] = buffer[3][:count] + str(states.get(i * width + j, 0)) + buffer[3][count+1:]
+        buffer[3] = buffer[3][:5] + str(player) + buffer[3][6:]
+
+    """print()
+    print(buffer[0])
+    print(buffer[1])
+    print(buffer[2])
+    print(buffer[3])
+    print()"""
+
+    for i in range(4):
+        judge = 0
+        for j in range(11):
+            judge = judge+1 if(buffer[i][j]==str(player)) else 0
+            if judge == 5:
+                return 1 if (j<10 and buffer[i][j+1]==str(player)) else 2 # 1長連禁手  2 win
+
+    for i in range(4):
+        before = restricted[1]
+        restricted[1] = restricted[1]+1 if(buffer[i].find("011110")!=-1 or buffer[i].find("011112")!=-1 or buffer[i].find("211110")!=-1 or buffer[i].find("011113")!=-1 or buffer[i].find("311110")!=-1) else restricted[1]
+        #if buffer[i].find("10111") != -1:
+        #    restricted[1] = restricted[1] if(buffer[i].find("1101110")!=-1 or buffer[i].find("0101111")!=-1 or buffer[i].find("1101111")!=-1) else restricted[1]+1
+        restricted[1] = restricted[1]+1 if(buffer[i].find("10111") != -1) else restricted[1]
+        if buffer[i].find("11011") != -1:
+            if(not (buffer[i].find("1110110")!=-1 or buffer[i].find("0110111")!=-1 or buffer[i].find("1110111")!=-1)):
+                restricted[1] = restricted[1]+1
+                #print(i, buffer[i].find("11011"))
+                if(not (buffer[i].find("1110110", buffer[i].find("11011")+1)!=-1 or buffer[i].find("0110111", buffer[i].find("11011")+1)!=-1 or buffer[i].find("1110111", buffer[i].find("11011")+1)!=-1)):
+                    if buffer[i].find("11011", buffer[i].find("11011")+1) != -1:
+                        restricted[1] = restricted[1]+1
+                        #print(i, buffer[i].find("11011", buffer[i].find("11011")+1))
+        #if buffer[i].find("11101") != -1:
+        #    restricted[1] = restricted[1] if(buffer[i].find("1111010")!=-1 or buffer[i].find("0111011")!=-1 or buffer[i].find("1111011")!=-1) else restricted[1]+1
+        restricted[1] = restricted[1]+1 if(buffer[i].find("11101") != -1) else restricted[1]
+        """print('before: ', restricted[1])"""
+        if restricted[1] - before > 1:
+            restricted[1] = restricted[1] if (buffer[i].find("111010111")!=-1 or buffer[i].find("11011011")!=-1 or buffer[i].find("1011101")!=-1) else 1
+            if restricted[1] > 1:
+                return 3
+        """print('after: ', restricted[1])"""
+
+    #print("四:{}".format(restricted[1]))
+    if restricted[1] > 1:
+        return 3
+
+    for i in range(4):
+        if buffer[i].find("01110") != -1:
+            restricted[0] = restricted[0] if(buffer[i].find("100111001")!=-1 or buffer[i].find("11101")!=-1 or buffer[i].find("10111")!=-1 or buffer[i].find("10011102")!=-1 or buffer[i].find("20111001")!=-1 or buffer[i].find("2011102")!=-1 or buffer[i].find("2011103")!=-1 or buffer[i].find("3011102")!=-1 or buffer[i].find("10011103")!=-1 or buffer[i].find("30111001")!=-1) else restricted[0]+1
+        if buffer[i].find("010110") != -1:
+            restricted[0] = restricted[0] if(buffer[i].find("00101101")!=-1 or buffer[i].find("10101100")!=-1 or buffer[i].find("10101101")!=-1 or buffer[i].find("10101102")!=-1 or buffer[i].find("20101101")!=-1 or buffer[i].find("10101103")!=-1 or buffer[i].find("30101101")!=-1) else restricted[0]+1
+        if buffer[i].find("011010") != -1:
+            restricted[0] = restricted[0] if(buffer[i].find("00110101")!=-1 or buffer[i].find("10110100")!=-1 or buffer[i].find("10110101")!=-1 or buffer[i].find("10110102")!=-1 or buffer[i].find("20110101")!=-1 or buffer[i].find("10110103")!=-1 or buffer[i].find("30110101")!=-1) else restricted[0]+1
+
+    #print("三:{}".format(restricted[0]))
+    #print()
+    if(restricted[0] > 1):
+        return 4
+    return 0
+
 def start_play_with_UI(start_player=0):
     # run a gomoku game with AI in GUI
     bcast_move = -1
@@ -231,50 +328,113 @@ def start_play_with_UI(start_player=0):
     current_player_num = start_player
     restart = 0
     end = False
+    SP = start_player
     if rank == 0:
-        SP = start_player
         UI = GUI(board.width)
 
-    while True:
+    gather_move_list,visits_list=[],[]
+    tlist,tlist2=[],[]
+    same_f_move = []
+    ban,count = -1,0
+    ins = ''
 
+    while True:
         if rank == 0:
             if current_player_num == 0:
                 UI.show_messages('Your turn')
             else:
                 UI.show_messages('AI\'s turn')
+                
+            for move_availables in board.availables:
+                i, j = board.move_to_location(move_availables)
+                ban = forbidden(i, j)
+    
+                if (ban == 1 or ban == 3 or ban == 4) and not end:
+                    UI._draw_ban((i, j))
 
         # AI's turn
         if current_player_num == 1 and not end:
+            availables = [i for i in board.availables]
+            
             # reset the search tree
             player2.reset_player()
-            if rank == 0:
-                # print prior probabilities
-                gather_move, move_probs = player2.get_action(board=board, is_selfplay=False, print_probs_value=True)
-            else:
-                gather_move, move_probs = player2.get_action(board=board, is_selfplay=False, print_probs_value=False)
-
-            gather_move_list = comm.gather(gather_move, root=0)
-            # print('list is', gather_move_list)
-
-            if rank == 0:
-                # gather ecah rank's move and get the most selected one
-                print('list is', gather_move_list)
-                bcast_move = Counter(gather_move_list).most_common()[0][0]
-                # print(board.move_to_location(bcast_move))
-
+            while True:
+                if rank == 0:
+                    # print prior probabilities
+                    gather_move, move_probs, visits = player2.get_action(board=board, is_selfplay=False, print_probs_value=True)
+                else:
+                    gather_move, move_probs, visits = player2.get_action(board=board, is_selfplay=False, print_probs_value=False)
+                
+                tlist = comm.gather(gather_move, root=0)
+                tlist2 = comm.gather(visits, root=0)
+    
+                if rank == 0:
+                    for i in tlist:
+                        gather_move_list.append(i)
+                    for i in tlist2:
+                        visits_list.append(i)
+                    print('rank: 0, gather_move_list:',gather_move_list)
+                    print('rank: 0, visits_list:',visits_list)
+                    c = Counter(gather_move_list).most_common()
+                    if len(c)>1 and c[0][1]==c[1][1]:
+                        same_f_move = [j[0] for j in c if j[1]==c[0][1]]
+                        max_v_list=[0]*len(same_f_move)
+                        for i in range(len(gather_move_list)):
+                            for j in range(len(same_f_move)):
+                                if gather_move_list[i]==same_f_move[j] and max_v_list[j]<visits_list[i]:
+                                    max_v_list[j] = visits_list[i]
+                        bcast_move = same_f_move[max_v_list.index(max(max_v_list))]
+                    else:
+                        bcast_move = c[0][0]
+                    print('rank: 0, bcast_move:',bcast_move)
+                    gather_move_list.clear()
+                    visits_list.clear()
+                    tlist.clear()
+                    tlist2.clear()
+                    if current_player_num == SP:
+                        x, y = board.move_to_location(bcast_move)
+                        ban = forbidden(x, y)
+                
+                if rank==0:
+                    if comm.Get_size()>1:
+                        for i in range(1,comm.Get_size()):
+                            comm.send('ban',dest=i)
+                        for i in range(1,comm.Get_size()):
+                            comm.send(ban,dest=i)
+                        for i in range(1,comm.Get_size()):
+                            comm.send(bcast_move,dest=i)
+                else:
+                    while True:
+                        ins = comm.recv(source=0)
+                        if ins=='ban':
+                            ban = comm.recv(source=0)
+                            bcast_move = comm.recv(source=0)
+                            break
+                
+                if ban == 0 or ban == 2:
+                    break
+                elif ban == 1 or ban == 3 or ban == 4:
+                    board.availables.remove(bcast_move)
+                    
+            board.availables = [i for i in availables]
         # human's turn
         else:
             if rank == 0:
                 inp = UI.get_input()
                 if inp[0] == 'move' and not end:
+                    count=0
                     if type(inp[1]) != int:
                         bcast_move = UI.loc_2_move(inp[1])
                     else:
                         bcast_move = inp[1]
+                    if current_player_num == SP:
+                        ban = forbidden(inp[2],inp[3])
+                        if ban == 1 or ban == 3 or ban == 4:
+                            continue
 
                 elif inp[0] == 'RestartGame':
                     UI.restart_game()
-                    restart = SP+1
+                    restart = 1
 
                 elif inp[0] == 'ResetScore':
                     UI.reset_score()
@@ -287,29 +447,69 @@ def start_play_with_UI(start_player=0):
                     SP = (SP + 1) % 2
                     UI.restart_game(False)
                     UI.reset_score()
-                    restart = SP+1
+                    restart = 1
+                    ins = 'switch'
 
                 else:
-                    # print('ignored inp:', inp)
                     continue
-
-        restart = comm.bcast(restart, root=0)
-
+                    
         if not end and not restart:
-            # bcast the move to other ranks
-            bcast_move = comm.bcast(bcast_move, root=0)
-            # print('!'*10,rank,bcast_move)
             if rank == 0:
-                print(board.move_to_location(bcast_move))
                 UI.render_step(bcast_move, board.current_player)
 
-            # human do move
-            board.do_move(bcast_move)
-            # print('rank:', rank, board.availables)
-
+            if rank==0:
+                board.do_move(bcast_move)
+                x, y = board.move_to_location(bcast_move)
+                print('last_move at: [{},{}]'.format(x,y))
+            
             current_player_num = (current_player_num + 1) % 2
-            end, winner = board.game_end()
+            
+            if rank==0:
+                if comm.Get_size()>1:
+                    for i in range(1,comm.Get_size()):
+                        comm.send('move',dest=i)
+                    for i in range(1,comm.Get_size()):
+                        comm.send(board,dest=i)
+            else:
+                while True:
+                    ins = comm.recv(source=0)
+                    if ins=='move':
+                        temp_board = comm.recv(source=0)
+                        board.availables.clear()
+                        board.states.clear()
+                        board.states_sequence.clear()
+                        for i in temp_board.availables:
+                            board.availables.append(i)
+                        for i in temp_board.states.keys():
+                            board.states[i] = temp_board.states[i]
+                        for i in temp_board.states_sequence:
+                            board.states_sequence.append(i)
+                        board.last_move = temp_board.last_move
+                        board.current_player = temp_board.current_player
+                        bcast_move = board.last_move
+                        temp_board = None
+                        break
+                    elif ins=='switch':
+                        temp_board = comm.recv(source=0)
+                        board.availables.clear()
+                        board.states.clear()
+                        board.states_sequence.clear()
+                        for i in temp_board.availables:
+                            board.availables.append(i)
+                        for i in temp_board.states.keys():
+                            board.states[i] = temp_board.states[i]
+                        for i in temp_board.states_sequence:
+                            board.states_sequence.append(i)
+                        board.last_move = temp_board.last_move
+                        board.current_player = temp_board.current_player
+                        bcast_move = board.last_move
+                        temp_board = None
+                        current_player_num = SP = comm.recv(source=0)
+                        player2.reset_player()
+                        break
 
+            end, winner = board.game_end()
+    
             # check if game end
             if end:
                 if rank == 0:
@@ -319,16 +519,28 @@ def start_play_with_UI(start_player=0):
                     else:
                         print("Game end. Tie")
         else:
+            temp_restart = comm.bcast(restart, root=0)
+            if rank!=0 and type(temp_restart)==int:
+                restart = temp_restart
+            elif rank!=0 and type(temp_restart)!=int and count==0:
+                count=1
+                continue
             if restart:
                 if restart == 'exit':
                     exit()
                 board.init_board()
+                current_player_num = SP
+                if rank==0 and ins=='switch':
+                    if comm.Get_size()>1:
+                        for i in range(1,comm.Get_size()):
+                            comm.send(ins,dest=i)
+                        for i in range(1,comm.Get_size()):
+                            comm.send(board,dest=i)
+                        for i in range(1,comm.Get_size()):
+                            comm.send(SP,dest=i)
                 player2.reset_player()
-                current_player_num = restart-1
                 restart = 0
                 end = False
 
-
 if __name__ == '__main__':
-    # start_play(start_player=0,is_shown=True)
     start_play_with_UI()

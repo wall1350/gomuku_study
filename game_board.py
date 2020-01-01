@@ -34,6 +34,7 @@ class Board(object):
         # the self.feature_planes is the number of history features
         # the additional plane is the color feature that indicate the current player
         # for example, in 11x11 board, is 11x11x9,8 for history features and 1 for current player
+        self.square_state = np.zeros((self.feature_planes+1, self.width, self.height))
         self.states_sequence = deque(maxlen=self.feature_planes)
         self.states_sequence.extendleft([[-1,-1]] * self.feature_planes)
         #use the deque to store last 8 moves
@@ -52,7 +53,7 @@ class Board(object):
         # once a move has been played, remove it right away
         self.states = {}
         self.last_move = -1
-
+        self.square_state = np.zeros((self.feature_planes+1, self.width, self.height))
         self.states_sequence = deque(maxlen=self.feature_planes)
         self.states_sequence.extendleft([[-1, -1]] * self.feature_planes)
 
@@ -88,9 +89,10 @@ class Board(object):
         return the board state from the perspective of the current player.
         state shape: (self.feature_planes+1) x width x height
         '''
-        square_state = np.zeros((self.feature_planes+1, self.width, self.height))
         if self.states:
             moves, players = np.array(list(zip(*self.states.items())))
+            #print("move:",moves)
+            #print("players:",players)
             # states contain the (key,value) indicate (move,player)
             # for example
             # self.states.items() get dict_items([(1, 1), (2, 1), (3, 2)])
@@ -100,29 +102,31 @@ class Board(object):
             # players = np.array([1, 1, 2])
             move_curr = moves[players == self.current_player]
             move_oppo = moves[players != self.current_player]
+            #print("move_curr:",move_curr)
+            #print("move_oppo:",move_oppo)
 
             # to construct the binary feature planes as alphazero did
             for i in range(self.feature_planes):
                 # put all moves on planes
                 if i%2 == 0:
-                    square_state[i][move_oppo // self.width,move_oppo % self.height] = 1.0
+                    self.square_state[i][move_oppo // self.width,move_oppo % self.height] = 1.0
                 else:
-                    square_state[i][move_curr // self.width,move_curr % self.height] = 1.0
+                    self.square_state[i][move_curr // self.width,move_curr % self.height] = 1.0
             # delete some moves to construct the planes with history features
             for i in range(0,len(self.states_sequence)-2,2):
                 for j in range(i+2,len(self.states_sequence),2):
                     if self.states_sequence[i][1]!= -1:
-                        assert square_state[j][self.states_sequence[i][0] // self.width,self.states_sequence[i][0] % self.height] == 1.0, 'wrong oppo number'
-                        square_state[j][self.states_sequence[i][0] // self.width, self.states_sequence[i][0] % self.height] = 0.
+                        assert self.square_state[j][self.states_sequence[i][0] // self.width,self.states_sequence[i][0] % self.height] == 1.0, 'wrong oppo number'
+                        self.square_state[j][self.states_sequence[i][0] // self.width, self.states_sequence[i][0] % self.height] = 0.
             for i in range(1,len(self.states_sequence)-2,2):
                 for j in range(i+2,len(self.states_sequence),2):
                     if self.states_sequence[i][1] != -1:
-                        assert square_state[j][self.states_sequence[i][0] // self.width,self.states_sequence[i][0] % self.height] ==1.0, 'wrong player number'
-                        square_state[j][self.states_sequence[i][0] // self.width, self.states_sequence[i][0] % self.height] = 0.
+                        assert self.square_state[j][self.states_sequence[i][0] // self.width,self.states_sequence[i][0] % self.height] ==1.0, 'wrong player number'
+                        self.square_state[j][self.states_sequence[i][0] // self.width, self.states_sequence[i][0] % self.height] = 0.
 
-        if len(self.states) % 2 == 0:
+        if len(self.states) % 2 != 0:
             # if %2==0，it's player1's turn to player,then we assign 1 to the the whole plane,otherwise all 0
-            square_state[self.feature_planes][:, :] = 1.0  # indicate the colour to play
+            self.square_state[self.feature_planes][:, :] = 1.0  # indicate the colour to play
 
         # we should reverse it before return,for example the board is like
         # 0,1,2,
@@ -132,7 +136,7 @@ class Board(object):
         # 6 7 8
         # 3 4 5
         # 0 1 2
-        return square_state[:, ::-1, :]
+        return self.square_state[:, ::-1, :]
 
     def do_move(self, move):
         '''
@@ -143,7 +147,10 @@ class Board(object):
         # save the move in states
         self.states_sequence.appendleft([move,self.current_player])
         # save the last some moves in deque，so as to construct the binary feature planes
-        self.availables.remove(move)
+        if move in self.availables:
+            self.availables.remove(move)
+        else:
+            print("Error! move: {0} not in self.availables:{1}".format(move,self.availables))
         #remove the played move from self.availables
         self.current_player = (
             self.players[0] if self.current_player == self.players[1]
@@ -215,6 +222,7 @@ class Board(object):
         Check whether the game is end
         '''
         end, winner = self.has_a_winner()
+        #print("end, winner:", end,", ",winner)
         if end:
             # if one win,return the winner
             return True, winner
@@ -333,6 +341,7 @@ class Game(object):
         #print()
         if(restricted[0] > 1):
             return 4
+        return 0
 
     def graphic(self, board, player1, player2):
         '''
@@ -386,7 +395,7 @@ class Game(object):
         while True:
             current_player = self.board.get_current_player()
             player_in_turn = players[current_player]
-            move,move_probs = player_in_turn.get_action(self.board,is_selfplay=False,print_probs_value=print_prob)
+            move,move_probs,visits = player_in_turn.get_action(self.board,is_selfplay=False,print_probs_value=print_prob)
 
             if current_player==start_player+1:
                 availables = [i for i in self.board.availables]
@@ -395,7 +404,7 @@ class Game(object):
                 while ban == 1 or ban == 3 or ban == 4:
                     print("禁手!!", i, j)
                     self.board.availables.remove(move)
-                    move, move_probs = player_in_turn.get_action(self.board, is_selfplay=False, print_probs_value=1)
+                    move, move_probs,visits = player_in_turn.get_action(self.board, is_selfplay=False, print_probs_value=1)
                     i, j = self.board.move_to_location(move)
                     ban = self.forbidden(i, j)
                 self.board.availables = [i for i in availables]
@@ -427,8 +436,6 @@ class Game(object):
         end = False
         while True:
             
-
-            
             if SP == 1:
                 UI._draw_text("Human(black)", (765, 150), text_height=UI.TestSize)
                 UI._draw_text("AlphaZero(white)", (925, 150), text_height=UI.TestSize)
@@ -437,10 +444,10 @@ class Game(object):
                 UI._draw_text("Human(white)", (925, 150), text_height=UI.TestSize)
 
             print('current_player', current_player)
-
             if current_player == 1:
                 UI.show_messages('Your turn')
             else:
+
                 UI.show_messages('AI\'s turn')
 
             for move_availables in self.board.availables:
@@ -451,18 +458,17 @@ class Game(object):
                     print("ban at ",move_availables)
                     UI._draw_ban((i, j))
 
-            if current_player == 2 and not end:
-                move, move_probs = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
+            if current_player == 2 and not end:                
+                move, move_probs,visits = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
                 if current_player == SP:
                     availables = [i for i in self.board.availables]
-
 
                     i, j = self.board.move_to_location(move)
                     ban = self.forbidden(i, j)
                     while ban == 1 or ban == 3 or ban == 4:
                         print("禁手!!", i, j)
                         self.board.availables.remove(move)
-                        move, move_probs = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
+                        move, move_probs, visits = AI.get_action(self.board, is_selfplay=False, print_probs_value=1)
                         i, j = self.board.move_to_location(move)
                         ban = self.forbidden(i, j)
                     self.board.availables = [i for i in availables]
@@ -515,18 +521,18 @@ class Game(object):
                     if winner != -1:
                         print("Game end. Winner is player", winner)
                         UI.add_score(winner)
-                        """
+                        
                         if winner == 1:
                             #UI.show_messages("Game end. Winner is 1 ")
                             UI._draw_text("Game end. Winner is  player 1 ", (500, 690), text_height=UI.TestSize)
                         elif winner == 2:
                             #UI.show_messages("Game end. Winner is 2 ")
                             UI._draw_text("Game end. Winner is player 2 ", (500, 690), text_height=UI.TestSize)
-                        """
+
+                        
                     else:
                         print("Game end. Tie")
-                        #UI._draw_text("Game end. Tie ", (775, 750), text_height=UI.TestSize)
-                    UI._show_endmsg(winner) #結束提示
+                        UI._draw_text("Game end. Tie ", (775, 750), text_height=UI.TestSize)
                     print(UI.score)
                     print()
 
@@ -539,7 +545,7 @@ class Game(object):
         p1, p2 = self.board.players
         states, mcts_probs, current_players = [], [], []
         while True:
-            move, move_probs = player.get_action(self.board,
+            move, move_probs, visits = player.get_action(self.board,
                                                  is_selfplay=True,
                                                  print_probs_value=False)
 
@@ -549,7 +555,7 @@ class Game(object):
                 ban = self.forbidden(i, j)
                 while ban == 1 or ban == 3 or ban == 4:
                     self.board.availables.remove(move)
-                    move, move_probs = player.get_action(self.board,
+                    move, move_probs, visits = player.get_action(self.board,
                                                          is_selfplay=True,
                                                          print_probs_value=False)
                     i, j = self.board.move_to_location(move)

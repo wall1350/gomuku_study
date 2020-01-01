@@ -49,8 +49,8 @@ def run(start_player=0,is_shown=1):
     # human vs AI or AI vs AI
     n = 5
     width, height = 15, 15
-    model_file = 'model_15_15_5/best_policy.model'
-    """model_file = 'test/current_policy.model'"""
+    """model_file = 'model_15_15_5/best_policy.model'"""
+    model_file = 'test/current_policy.model'
     p = os.getcwd()
     model_file = path.join(p,model_file)
 
@@ -69,7 +69,7 @@ def run(start_player=0,is_shown=1):
                                    action_fc=best_policy.action_fc_test,
                                    evaluation_fc=best_policy.evaluation_fc2_test,
                                    c_puct=5,
-                                   n_playout=100,
+                                   n_playout=10,
                                    is_selfplay=False)
 
     # alpha_zero_player_oppo = MCTSPlayer(policy_value_function=best_policy.policy_value_fn_random,
